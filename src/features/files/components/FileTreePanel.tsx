@@ -49,6 +49,7 @@ type FileTreePanelProps = {
   onInsertText?: (text: string) => void;
   showTabs?: boolean;
   showMentionActions?: boolean;
+  onOpenFile?: (path: string) => void;
   openTargets: OpenAppTarget[];
   openAppIconById: Record<string, string>;
   selectedOpenAppId: string;
@@ -229,6 +230,7 @@ export function FileTreePanel({
   onInsertText,
   showTabs = true,
   showMentionActions = true,
+  onOpenFile,
   openTargets,
   openAppIconById,
   selectedOpenAppId,
@@ -517,6 +519,10 @@ export function FileTreePanel({
             onClick={(event) => {
               if (isFolder) {
                 toggleFolder(node.path);
+                return;
+              }
+              if (onOpenFile) {
+                onOpenFile(node.path);
                 return;
               }
               openPreview(node.path, event.currentTarget);

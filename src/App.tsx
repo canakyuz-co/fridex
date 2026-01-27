@@ -33,7 +33,7 @@ import errorSoundUrl from "./assets/error-notification.mp3";
 import { AppLayout } from "./features/app/components/AppLayout";
 import { AppModals } from "./features/app/components/AppModals";
 import { MainHeaderActions } from "./features/app/components/MainHeaderActions";
-import { EditorPlaceholder } from "./features/editor/components/EditorPlaceholder";
+import { EditorView } from "./features/editor/components/EditorView";
 import { useLayoutNodes } from "./features/layout/hooks/useLayoutNodes";
 import { useWorkspaceDropZone } from "./features/workspaces/hooks/useWorkspaceDropZone";
 import { useThreads } from "./features/threads/hooks/useThreads";
@@ -77,6 +77,7 @@ import { useWorktreePrompt } from "./features/workspaces/hooks/useWorktreePrompt
 import { useClonePrompt } from "./features/workspaces/hooks/useClonePrompt";
 import { useWorkspaceController } from "./features/app/hooks/useWorkspaceController";
 import { useWorkspaceSelection } from "./features/workspaces/hooks/useWorkspaceSelection";
+import { useEditorState } from "./features/editor/hooks/useEditorState";
 import { useLocalUsage } from "./features/home/hooks/useLocalUsage";
 import { useGitHubPanelController } from "./features/app/hooks/useGitHubPanelController";
 import { useSettingsModalState } from "./features/app/hooks/useSettingsModalState";
@@ -453,6 +454,7 @@ function MainApp() {
     activeWorkspace,
     onDebug: addDebugEntry,
   });
+  const editorState = useEditorState({ workspaceId: activeWorkspaceId });
   const { branches, checkoutBranch, createBranch } = useGitBranches({
     activeWorkspace,
     onDebug: addDebugEntry
@@ -1899,7 +1901,15 @@ function MainApp() {
 
   const mainMessagesNode = showWorkspaceHome ? workspaceHomeNode : messagesNode;
   const editorNode = (
-    <EditorPlaceholder hasWorkspace={Boolean(activeWorkspace)} />
+    <EditorView
+      workspaceId={activeWorkspaceId}
+      openPaths={editorState.openPaths}
+      activePath={editorState.activePath}
+      buffersByPath={editorState.buffersByPath}
+      onSelectPath={editorState.setActivePath}
+      onClosePath={editorState.closeFile}
+      onContentChange={editorState.updateContent}
+    />
   );
   const handleEditorPanelChange = useCallback(() => {}, []);
   const editorSidebarNode =
@@ -1913,6 +1923,7 @@ function MainApp() {
         onFilePanelModeChange={handleEditorPanelChange}
         showTabs={false}
         showMentionActions={false}
+        onOpenFile={editorState.openFile}
         openTargets={appSettings.openAppTargets}
         openAppIconById={openAppIconById}
         selectedOpenAppId={appSettings.selectedOpenAppId}
