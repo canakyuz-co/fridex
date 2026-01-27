@@ -47,6 +47,8 @@ type FileTreePanelProps = {
   filePanelMode: PanelTabId;
   onFilePanelModeChange: (mode: PanelTabId) => void;
   onInsertText?: (text: string) => void;
+  showTabs?: boolean;
+  showMentionActions?: boolean;
   openTargets: OpenAppTarget[];
   openAppIconById: Record<string, string>;
   selectedOpenAppId: string;
@@ -225,6 +227,8 @@ export function FileTreePanel({
   filePanelMode,
   onFilePanelModeChange,
   onInsertText,
+  showTabs = true,
+  showMentionActions = true,
   openTargets,
   openAppIconById,
   selectedOpenAppId,
@@ -535,7 +539,7 @@ export function FileTreePanel({
             </span>
             <span className="file-tree-name">{node.name}</span>
           </button>
-          {!isFolder && (
+          {!isFolder && showMentionActions && onInsertText && (
             <button
               type="button"
               className="ghost icon-button file-tree-action"
@@ -562,7 +566,9 @@ export function FileTreePanel({
   return (
     <aside className="diff-panel file-tree-panel">
       <div className="git-panel-header">
-        <PanelTabs active={filePanelMode} onSelect={onFilePanelModeChange} />
+        {showTabs ? (
+          <PanelTabs active={filePanelMode} onSelect={onFilePanelModeChange} />
+        ) : null}
         <div className="file-tree-meta">
           <div className="file-tree-count">
           {filteredFiles.length

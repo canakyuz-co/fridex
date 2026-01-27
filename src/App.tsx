@@ -58,6 +58,7 @@ import { useRenameWorktreePrompt } from "./features/workspaces/hooks/useRenameWo
 import { useLayoutController } from "./features/app/hooks/useLayoutController";
 import { useWindowLabel } from "./features/layout/hooks/useWindowLabel";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { FileTreePanel } from "./features/files/components/FileTreePanel";
 import {
   SidebarCollapseButton,
   TitlebarExpandControls,
@@ -1900,6 +1901,28 @@ function MainApp() {
   const editorNode = (
     <EditorPlaceholder hasWorkspace={Boolean(activeWorkspace)} />
   );
+  const handleEditorPanelChange = useCallback(() => {}, []);
+  const editorSidebarNode =
+    activeWorkspace && activeWorkspaceId ? (
+      <FileTreePanel
+        workspaceId={activeWorkspaceId}
+        workspacePath={activeWorkspace.path}
+        files={files}
+        isLoading={isFilesLoading}
+        filePanelMode="files"
+        onFilePanelModeChange={handleEditorPanelChange}
+        showTabs={false}
+        showMentionActions={false}
+        openTargets={appSettings.openAppTargets}
+        openAppIconById={openAppIconById}
+        selectedOpenAppId={appSettings.selectedOpenAppId}
+        onSelectOpenAppId={handleSelectOpenAppId}
+      />
+    ) : (
+      sidebarNode
+    );
+  const sidebarNodeForLayout =
+    activeTab === "editor" ? editorSidebarNode : sidebarNode;
 
   const desktopTopbarLeftNodeWithToggle = !isCompact ? (
     <div className="topbar-leading">
@@ -1957,7 +1980,7 @@ function MainApp() {
         centerMode={centerMode}
         hasActivePlan={hasActivePlan}
         activeWorkspace={Boolean(activeWorkspace)}
-        sidebarNode={sidebarNode}
+        sidebarNode={sidebarNodeForLayout}
         messagesNode={mainMessagesNode}
         editorNode={editorNode}
         composerNode={composerNode}
