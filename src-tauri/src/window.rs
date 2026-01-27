@@ -1,4 +1,4 @@
-use tauri::{Theme, Window};
+use tauri::{Theme, WebviewWindow, Window};
 
 #[cfg(test)]
 use std::sync::{Mutex, OnceLock};
@@ -80,7 +80,7 @@ pub(crate) fn apply_window_appearance(window: &Window, theme: &str) -> Result<()
 }
 
 // Ensures the main window is visible and focused after startup; O(1) time, O(1) space.
-pub(crate) fn ensure_window_visible(window: &Window) -> Result<(), String> {
+pub(crate) fn ensure_window_visible(window: &WebviewWindow) -> Result<(), String> {
     let is_visible = window.is_visible().map_err(|error| error.to_string())?;
     if !is_visible {
         window.show().map_err(|error| error.to_string())?;
