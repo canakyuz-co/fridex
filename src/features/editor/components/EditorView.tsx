@@ -56,28 +56,6 @@ function configureMonaco(monaco: Monaco) {
       return new editorWorker();
     },
   };
-
-  monaco.editor.defineTheme("friday-dark", {
-    base: "vs-dark",
-    inherit: true,
-    rules: [],
-    colors: {
-      "editor.background": "#0c1119",
-      "editor.foreground": "#e6e7ea",
-      "editorLineNumber.foreground": "#4f586a",
-      "editorLineNumber.activeForeground": "#c5cad6",
-      "editorCursor.foreground": "#9bd1ff",
-      "editor.selectionBackground": "#234c74",
-      "editor.inactiveSelectionBackground": "#1a2a3f",
-      "editorIndentGuide.background": "#1c2533",
-      "editorIndentGuide.activeBackground": "#2a3546",
-      "editor.lineHighlightBackground": "#0c1119",
-      "editorLineHighlightBorder": "#0c1119",
-      "editorGutter.background": "#0c1119",
-      "editorWhitespace.foreground": "#2a3546",
-      "editorRuler.foreground": "#1f2a3a",
-    },
-  });
 }
 
 export function EditorView({
@@ -92,6 +70,7 @@ export function EditorView({
 }: EditorViewProps) {
   const activeBuffer = activePath ? buffersByPath[activePath] : null;
   const activePathRef = useRef(activePath);
+  const monacoRef = useRef<Monaco | null>(null);
 
   useEffect(() => {
     activePathRef.current = activePath;
@@ -108,14 +87,45 @@ export function EditorView({
     [openPaths, activePath, buffersByPath],
   );
 
+  const applyTheme = useCallback((monaco: Monaco) => {
+    const styles = getComputedStyle(document.documentElement);
+    const readVar = (name: string, fallback: string) => {
+      const value = styles.getPropertyValue(name).trim();
+      return value || fallback;
+    };
+    monaco.editor.defineTheme("friday-app", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": readVar("--surface-messages", "#0c1119"),
+        "editor.foreground": readVar("--text-primary", "#e6e7ea"),
+        "editorLineNumber.foreground": readVar("--text-dim", "#586072"),
+        "editorLineNumber.activeForeground": readVar("--text-stronger", "#c5cad6"),
+        "editorCursor.foreground": readVar("--border-accent", "#9bd1ff"),
+        "editor.selectionBackground": readVar("--surface-active", "#234c74"),
+        "editor.inactiveSelectionBackground": readVar("--surface-hover", "#1a2a3f"),
+        "editorIndentGuide.background": readVar("--border-muted", "#1c2533"),
+        "editorIndentGuide.activeBackground": readVar("--border-strong", "#2a3546"),
+        "editor.lineHighlightBackground": "transparent",
+        "editorLineHighlightBorder": "transparent",
+        "editorGutter.background": readVar("--surface-messages", "#0c1119"),
+        "editorWhitespace.foreground": readVar("--border-muted", "#2a3546"),
+        "editorRuler.foreground": readVar("--border-muted", "#1f2a3a"),
+      },
+    });
+    monaco.editor.setTheme("friday-app");
+  }, []);
+
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     configureMonaco(monaco);
-    monaco.editor.setTheme("friday-dark");
-  }, []);
+    applyTheme(monaco);
+  }, [applyTheme]);
 
   const handleMount = useCallback(
     (editorInstance: Monaco.editor.IStandaloneCodeEditor, monaco: Monaco) => {
-      monaco.editor.setTheme("friday-dark");
+      monacoRef.current = monaco;
+      applyTheme(monaco);
       editorInstance.addCommand(
         monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
         () => {
@@ -126,8 +136,24 @@ export function EditorView({
         },
       );
     },
-    [onSavePath],
+    [applyTheme, onSavePath],
   );
+
+  useEffect(() => {
+    if (!monacoRef.current) {
+      return;
+    }
+    const observer = new MutationObserver(() => {
+      if (monacoRef.current) {
+        applyTheme(monacoRef.current);
+      }
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme", "class"],
+    });
+    return () => observer.disconnect();
+  }, [applyTheme]);
 
   if (!workspaceId) {
     return <EditorPlaceholder hasWorkspace={false} />;

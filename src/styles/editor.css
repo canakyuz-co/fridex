@@ -117,7 +117,7 @@
 .monaco-editor,
 .monaco-editor .margin,
 .monaco-editor-background {
-  background-color: #0d121b !important;
+  background-color: var(--surface-messages) !important;
 }
 
 .editor-toggle {
