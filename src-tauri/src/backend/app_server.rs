@@ -325,7 +325,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
     let init_params = json!({
         "clientInfo": {
             "name": "codex_monitor",
-            "title": "CodexMonitor",
+            "title": "Friday",
             "version": client_version
         }
     });

@@ -42,6 +42,9 @@ import type {
   RequestUserInputRequest,
   RequestUserInputResponse,
   SkillOption,
+  TaskEntry,
+  TaskStatus,
+  TaskView,
   ThreadSummary,
   ThreadTokenUsage,
   TurnPlan,
@@ -183,6 +186,18 @@ type LayoutNodesOptions = {
   usageWorkspaceId: string | null;
   usageWorkspaceOptions: Array<{ id: string; label: string }>;
   onUsageWorkspaceChange: (workspaceId: string | null) => void;
+  tasks: TaskEntry[];
+  isLoadingTasks: boolean;
+  tasksError: string | null;
+  tasksView: TaskView;
+  onTasksViewChange: (view: TaskView) => void;
+  tasksWorkspaceId: string | null;
+  tasksWorkspaceOptions: Array<{ id: string; label: string }>;
+  onTasksWorkspaceChange: (workspaceId: string | null) => void;
+  onTaskCreate: (input: { title: string; content: string }) => Promise<void>;
+  onTaskUpdate: (input: { id: string; title: string; content: string }) => Promise<void>;
+  onTaskDelete: (id: string) => void | Promise<void>;
+  onTaskStatusChange: (id: string, status: TaskStatus) => Promise<void>;
   onSelectHomeThread: (workspaceId: string, threadId: string) => void;
   activeWorkspace: WorkspaceInfo | null;
   activeParentWorkspace: WorkspaceInfo | null;
@@ -532,7 +547,6 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       prompts={options.prompts}
       files={options.files}
       textareaRef={options.textareaRef}
-      historyKey={options.activeWorkspace?.id ?? null}
       editorSettings={options.composerEditorSettings}
       editorExpanded={options.composerEditorExpanded}
       onToggleEditorExpanded={options.onToggleComposerEditorExpanded}
@@ -586,6 +600,18 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       usageWorkspaceId={options.usageWorkspaceId}
       usageWorkspaceOptions={options.usageWorkspaceOptions}
       onUsageWorkspaceChange={options.onUsageWorkspaceChange}
+      tasks={options.tasks}
+      isLoadingTasks={options.isLoadingTasks}
+      tasksError={options.tasksError}
+      tasksView={options.tasksView}
+      onTasksViewChange={options.onTasksViewChange}
+      tasksWorkspaceId={options.tasksWorkspaceId}
+      tasksWorkspaceOptions={options.tasksWorkspaceOptions}
+      onTasksWorkspaceChange={options.onTasksWorkspaceChange}
+      onTaskCreate={options.onTaskCreate}
+      onTaskUpdate={options.onTaskUpdate}
+      onTaskDelete={options.onTaskDelete}
+      onTaskStatusChange={options.onTaskStatusChange}
       onSelectThread={options.onSelectHomeThread}
     />
   );

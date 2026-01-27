@@ -34,6 +34,20 @@ export type WorkspaceInfo = {
   settings: WorkspaceSettings;
 };
 
+export type TaskStatus = "todo" | "doing" | "done";
+
+export type TaskEntry = {
+  id: string;
+  title: string;
+  content: string;
+  status: TaskStatus;
+  workspaceId: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type TaskView = "checklist" | "kanban";
+
 export type AppServerEvent = {
   workspace_id: string;
   message: Record<string, unknown>;

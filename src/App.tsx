@@ -91,12 +91,14 @@ import { useTerminalController } from "./features/terminal/hooks/useTerminalCont
 import { useWorkspaceLaunchScript } from "./features/app/hooks/useWorkspaceLaunchScript";
 import { useWorktreeSetupScript } from "./features/app/hooks/useWorktreeSetupScript";
 import { useGitCommitController } from "./features/app/hooks/useGitCommitController";
+import { useTasks } from "./features/tasks/hooks/useTasks";
 import { WorkspaceHome } from "./features/workspaces/components/WorkspaceHome";
 import { useWorkspaceHome } from "./features/workspaces/hooks/useWorkspaceHome";
 import { pickWorkspacePath } from "./services/tauri";
 import type {
   AccessMode,
   ComposerEditorSettings,
+  TaskView,
   WorkspaceInfo,
 } from "./types";
 import { OPEN_APP_STORAGE_KEY } from "./features/app/constants";
@@ -259,7 +261,6 @@ function MainApp() {
     successSoundUrl,
     errorSoundUrl,
   });
-
   const { errorToasts, dismissErrorToast } = useErrorToasts();
 
   useEffect(() => {
@@ -695,52 +696,6 @@ function MainApp() {
     }
   }, [activeWorkspace, openRenameWorktreePrompt]);
 
-  const {
-    terminalTabs,
-    activeTerminalId,
-    onSelectTerminal,
-    onNewTerminal,
-    onCloseTerminal,
-    terminalState,
-    ensureTerminalWithTitle,
-    restartTerminalSession,
-  } = useTerminalController({
-    activeWorkspaceId,
-    activeWorkspace,
-    terminalOpen,
-    onCloseTerminalPanel: closeTerminalPanel,
-    onDebug: addDebugEntry,
-  });
-
-  const ensureLaunchTerminal = useCallback(
-    (workspaceId: string) => ensureTerminalWithTitle(workspaceId, "launch", "Launch"),
-    [ensureTerminalWithTitle],
-  );
-
-  const launchScriptState = useWorkspaceLaunchScript({
-    activeWorkspace,
-    updateWorkspaceSettings,
-    openTerminal,
-    ensureLaunchTerminal,
-    restartLaunchSession: restartTerminalSession,
-    terminalState,
-    activeTerminalId,
-  });
-
-  const worktreeSetupScriptState = useWorktreeSetupScript({
-    ensureTerminalWithTitle,
-    restartTerminalSession,
-    openTerminal,
-    onDebug: addDebugEntry,
-  });
-
-  const handleWorktreeCreated = useCallback(
-    async (worktree: WorkspaceInfo, _parentWorkspace?: WorkspaceInfo) => {
-      await worktreeSetupScriptState.maybeRunWorktreeSetupScript(worktree);
-    },
-    [worktreeSetupScriptState],
-  );
-
   const { exitDiffView, selectWorkspace, selectHome } = useWorkspaceSelection({
     workspaces,
     isCompact,
@@ -944,6 +899,42 @@ function MainApp() {
     error: localUsageError,
     refresh: refreshLocalUsage,
   } = useLocalUsage(showHome, usageWorkspacePath);
+  const {
+    tasks,
+    isLoading: isLoadingTasks,
+    error: tasksError,
+    create: createTask,
+    update: updateTask,
+    remove: deleteTask,
+    setStatus: setTaskStatus,
+  } = useTasks();
+  const [tasksView, setTasksView] = useState<TaskView>("checklist");
+  const [tasksWorkspaceId, setTasksWorkspaceId] = useState<string | null>(null);
+  const tasksWorkspaceOptions = useMemo(() => {
+    const options = workspaces.map((workspace) => {
+      const groupName = getWorkspaceGroupName(workspace.id);
+      const label = groupName
+        ? `${groupName} / ${workspace.name}`
+        : workspace.name;
+      return { id: workspace.id, label };
+    });
+    return [{ id: "", label: "All projects" }, ...options];
+  }, [getWorkspaceGroupName, workspaces]);
+  const filteredTasks = useMemo(() => {
+    if (!tasksWorkspaceId) {
+      return tasks;
+    }
+    return tasks.filter((task) => task.workspaceId === tasksWorkspaceId);
+  }, [tasks, tasksWorkspaceId]);
+  useEffect(() => {
+    if (!tasksWorkspaceId) {
+      return;
+    }
+    if (workspaces.some((workspace) => workspace.id === tasksWorkspaceId)) {
+      return;
+    }
+    setTasksWorkspaceId(null);
+  }, [tasksWorkspaceId, workspaces]);
   const canInterrupt = activeThreadId
     ? threadStatusById[activeThreadId]?.isProcessing ?? false
     : false;
@@ -1012,7 +1003,6 @@ function MainApp() {
     connectWorkspace,
     startThreadForWorkspace,
     sendUserMessageToThread,
-    onWorktreeCreated: handleWorktreeCreated,
   });
 
   const {
@@ -1373,6 +1363,51 @@ function MainApp() {
     ? centerMode === "chat" || centerMode === "diff"
     : (isTablet ? tabletTab : activeTab) === "codex") && !showWorkspaceHome;
   const showGitDetail = Boolean(selectedDiffPath) && isPhone;
+  const {
+    terminalTabs,
+    activeTerminalId,
+    onSelectTerminal,
+    onNewTerminal,
+    onCloseTerminal,
+    terminalState,
+    ensureTerminalWithTitle,
+    restartTerminalSession,
+  } = useTerminalController({
+    activeWorkspaceId,
+    activeWorkspace,
+    terminalOpen,
+    onCloseTerminalPanel: closeTerminalPanel,
+    onDebug: addDebugEntry,
+  });
+
+  const ensureLaunchTerminal = useCallback(
+    (workspaceId: string) => ensureTerminalWithTitle(workspaceId, "launch", "Launch"),
+    [ensureTerminalWithTitle],
+  );
+
+  const launchScriptState = useWorkspaceLaunchScript({
+    activeWorkspace,
+    updateWorkspaceSettings,
+    openTerminal,
+    ensureLaunchTerminal,
+    restartLaunchSession: restartTerminalSession,
+    terminalState,
+    activeTerminalId,
+  });
+
+  const worktreeSetupScriptState = useWorktreeSetupScript({
+    ensureTerminalWithTitle,
+    restartTerminalSession,
+    openTerminal,
+    onDebug: addDebugEntry,
+  });
+
+  const handleWorktreeCreated = useCallback(
+    async (worktree: WorkspaceInfo, _parentWorkspace?: WorkspaceInfo) => {
+      await worktreeSetupScriptState.maybeRunWorktreeSetupScript(worktree);
+    },
+    [worktreeSetupScriptState],
+  );
 
   const { handleCycleAgent, handleCycleWorkspace } = useWorkspaceCycling({
     workspaces,
@@ -1472,6 +1507,8 @@ function MainApp() {
     handleApprovalDecision,
     handleApprovalRemember,
     handleUserInputSubmit,
+    errorToasts,
+    onDismissErrorToast: dismissErrorToast,
     onOpenSettings: () => openSettings(),
     onOpenDictationSettings: () => openSettings("dictation"),
     onOpenDebug: handleDebugClick,
@@ -1549,8 +1586,6 @@ function MainApp() {
     updaterState,
     onUpdate: startUpdate,
     onDismissUpdate: dismissUpdate,
-    errorToasts,
-    onDismissErrorToast: dismissErrorToast,
     latestAgentRuns,
     isLoadingLatestAgents,
     localUsageSnapshot,
@@ -1564,6 +1599,20 @@ function MainApp() {
     usageWorkspaceId,
     usageWorkspaceOptions,
     onUsageWorkspaceChange: setUsageWorkspaceId,
+    tasks: filteredTasks,
+    isLoadingTasks,
+    tasksError,
+    tasksView,
+    onTasksViewChange: setTasksView,
+    tasksWorkspaceId,
+    tasksWorkspaceOptions,
+    onTasksWorkspaceChange: setTasksWorkspaceId,
+    onTaskCreate: async ({ title, content }) => {
+      await createTask({ title, content, workspaceId: tasksWorkspaceId });
+    },
+    onTaskUpdate: updateTask,
+    onTaskDelete: deleteTask,
+    onTaskStatusChange: setTaskStatus,
     onSelectHomeThread: (workspaceId, threadId) => {
       exitDiffView();
       selectWorkspace(workspaceId);
@@ -1932,7 +1981,7 @@ function MainApp() {
         onRenamePromptConfirm={handleRenamePromptConfirm}
         worktreePrompt={worktreePrompt}
         onWorktreePromptChange={updateWorktreeBranch}
-        onWorktreeSetupScriptChange={updateWorktreeSetupScript}
+        onWorktreePromptSetupScriptChange={updateWorktreeSetupScript}
         onWorktreePromptCancel={cancelWorktreePrompt}
         onWorktreePromptConfirm={confirmWorktreePrompt}
         clonePrompt={clonePrompt}

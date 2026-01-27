@@ -1,6 +1,26 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum TaskStatus {
+    Todo,
+    Doing,
+    Done,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TaskEntry {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) content: String,
+    pub(crate) status: TaskStatus,
+    pub(crate) workspace_id: Option<String>,
+    pub(crate) created_at: i64,
+    pub(crate) updated_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitFileStatus {
     pub(crate) path: String,
     pub(crate) status: String,
@@ -180,6 +200,13 @@ pub(crate) struct LocalUsageSnapshot {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WorktreeSetupStatus {
+    pub(crate) should_run: bool,
+    pub(crate) script: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct BranchInfo {
     pub(crate) name: String,
     pub(crate) last_commit: i64,
@@ -270,13 +297,6 @@ pub(crate) struct WorkspaceSettings {
     pub(crate) launch_script: Option<String>,
     #[serde(default, rename = "worktreeSetupScript")]
     pub(crate) worktree_setup_script: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct WorktreeSetupStatus {
-    #[serde(rename = "shouldRun")]
-    pub(crate) should_run: bool,
-    pub(crate) script: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

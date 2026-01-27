@@ -24,11 +24,13 @@ mod rules;
 mod settings;
 mod state;
 mod storage;
+mod tasks;
 mod terminal;
 mod types;
 mod utils;
 mod window;
 mod workspaces;
+mod ai_core;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -58,6 +60,9 @@ pub fn run() {
         .setup(|app| {
             let state = state::AppState::load(&app.handle());
             app.manage(state);
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window::ensure_window_visible(&window);
+            }
             #[cfg(desktop)]
             {
                 app.handle()
@@ -70,11 +75,31 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
 
     let app = builder
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_shortcut("Alt+Space")
+                .expect("Failed to register global shortcut")
+                .with_handler(|app, _shortcut, event| {
+                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        if let Some(window) = app.get_webview_window("main") {
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                    }
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_liquid_glass::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
+            ai_core::commands::ai_provider_status,
+            ai_core::commands::ai_generate_stream,
             settings::get_app_settings,
             settings::update_app_settings,
             settings::get_codex_config_path,
@@ -157,7 +182,12 @@ pub fn run() {
             dictation::dictation_request_permission,
             dictation::dictation_stop,
             dictation::dictation_cancel,
-            local_usage::local_usage_snapshot
+            local_usage::local_usage_snapshot,
+            tasks::list_tasks,
+            tasks::create_task,
+            tasks::update_task,
+            tasks::set_task_status,
+            tasks::delete_task
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

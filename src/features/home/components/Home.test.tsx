@@ -17,6 +17,18 @@ const baseProps = {
   usageWorkspaceId: null,
   usageWorkspaceOptions: [],
   onUsageWorkspaceChange: vi.fn(),
+  tasks: [],
+  isLoadingTasks: false,
+  tasksError: null,
+  tasksView: "checklist" as const,
+  onTasksViewChange: vi.fn(),
+  tasksWorkspaceId: null,
+  tasksWorkspaceOptions: [{ id: "", label: "All projects" }],
+  onTasksWorkspaceChange: vi.fn(),
+  onTaskCreate: vi.fn(),
+  onTaskUpdate: vi.fn(),
+  onTaskDelete: vi.fn(),
+  onTaskStatusChange: vi.fn(),
   onSelectThread: vi.fn(),
 };
 
@@ -30,7 +42,7 @@ describe("Home", () => {
           {
             message: "Ship the dashboard refresh",
             timestamp: Date.now(),
-            projectName: "CodexMonitor",
+            projectName: "Friday",
             groupName: "Frontend",
             workspaceId: "workspace-1",
             threadId: "thread-1",
@@ -42,7 +54,7 @@ describe("Home", () => {
     );
 
     expect(screen.getByText("Latest agents")).toBeTruthy();
-    expect(screen.getByText("CodexMonitor")).toBeTruthy();
+    expect(screen.getByText("Friday")).toBeTruthy();
     expect(screen.getByText("Frontend")).toBeTruthy();
     const message = screen.getByText("Ship the dashboard refresh");
     const card = message.closest("button");

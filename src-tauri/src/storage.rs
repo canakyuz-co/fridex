@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::types::{AppSettings, WorkspaceEntry};
+use crate::types::{AppSettings, TaskEntry, WorkspaceEntry};
 
 pub(crate) fn read_workspaces(path: &PathBuf) -> Result<HashMap<String, WorkspaceEntry>, String> {
     if !path.exists() {
@@ -39,6 +39,22 @@ pub(crate) fn write_settings(path: &PathBuf, settings: &AppSettings) -> Result<(
     std::fs::write(path, data).map_err(|e| e.to_string())
 }
 
+pub(crate) fn read_tasks(path: &PathBuf) -> Result<Vec<TaskEntry>, String> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&data).map_err(|e| e.to_string())
+}
+
+pub(crate) fn write_tasks(path: &PathBuf, tasks: &[TaskEntry]) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let data = serde_json::to_string_pretty(tasks).map_err(|e| e.to_string())?;
+    std::fs::write(path, data).map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{read_workspaces, write_workspaces};
@@ -48,7 +64,7 @@ mod tests {
     #[test]
     fn write_read_workspaces_persists_sort_and_group() {
         let temp_dir =
-            std::env::temp_dir().join(format!("codex-monitor-test-{}", Uuid::new_v4()));
+            std::env::temp_dir().join(format!("friday-test-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&temp_dir).expect("create temp dir");
         let path = temp_dir.join("workspaces.json");
 

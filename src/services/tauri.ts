@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, Channel } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type {
   AppSettings,
@@ -6,6 +6,8 @@ import type {
   DictationModelStatus,
   DictationSessionState,
   LocalUsageSnapshot,
+  TaskEntry,
+  TaskStatus,
   WorkspaceInfo,
   WorkspaceSettings,
 } from "../types";
@@ -58,8 +60,7 @@ export async function listWorkspaces(): Promise<WorkspaceInfo[]> {
     return await invoke<WorkspaceInfo[]>("list_workspaces");
   } catch (error) {
     if (isMissingTauriInvokeError(error)) {
-      // In non-Tauri environments (e.g., Electron/web previews), the invoke
-      // bridge may be missing. Treat this as "no workspaces" instead of crashing.
+      // In non-Tauri environments, the invoke bridge may be missing.
       console.warn("Tauri invoke bridge unavailable; returning empty workspaces list.");
       return [];
     }
@@ -641,6 +642,37 @@ export async function listThreads(
   return invoke<any>("list_threads", { workspaceId, cursor, limit });
 }
 
+export async function listTasks(): Promise<TaskEntry[]> {
+  return invoke<TaskEntry[]>("list_tasks");
+}
+
+export async function createTask(
+  title: string,
+  content: string,
+  workspaceId: string | null,
+): Promise<TaskEntry> {
+  return invoke<TaskEntry>("create_task", { title, content, workspaceId });
+}
+
+export async function updateTask(
+  id: string,
+  title: string,
+  content: string,
+): Promise<TaskEntry> {
+  return invoke<TaskEntry>("update_task", { id, title, content });
+}
+
+export async function setTaskStatus(
+  id: string,
+  status: TaskStatus,
+): Promise<TaskEntry> {
+  return invoke<TaskEntry>("set_task_status", { id, status });
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  return invoke("delete_task", { id });
+}
+
 export async function resumeThread(workspaceId: string, threadId: string) {
   return invoke<any>("resume_thread", { workspaceId, threadId });
 }
@@ -659,4 +691,31 @@ export async function generateCommitMessage(
   workspaceId: string,
 ): Promise<string> {
   return invoke("generate_commit_message", { workspaceId });
+}
+
+// --- AI Core Commands ---
+
+export async function checkAIProviderStatus(providerId: string): Promise<boolean> {
+  return invoke("ai_provider_status", { providerId });
+}
+
+export async function streamAIGeneration(
+  providerId: string,
+  model: string | null,
+  messages: { role: string; content: string }[],
+  temperature: number,
+  onChunk: (chunk: string) => void
+): Promise<void> {
+  const channel = new Channel<string>();
+  channel.onmessage = (message) => {
+    onChunk(message);
+  };
+
+  return invoke("ai_generate_stream", {
+    providerId,
+    model,
+    messages,
+    temperature,
+    onEvent: channel,
+  });
 }

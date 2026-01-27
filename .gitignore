@@ -23,6 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 /release-artifacts
-CodexMonitor.zip
+Friday.zip
 .codex-worktrees/
 .codexmonitor/

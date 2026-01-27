@@ -1,7 +1,7 @@
-# CodexMonitor Agent Guide
+# Friday Agent Guide
 
 ## Project Summary
-CodexMonitor is a macOS Tauri app that orchestrates Codex agents across local workspaces. The frontend is React + Vite; the backend is a Tauri Rust process that spawns `codex app-server` per workspace and streams JSON-RPC events.
+Friday is a macOS Tauri app that orchestrates Codex agents across local workspaces. The frontend is React + Vite; the backend is a Tauri Rust process that spawns `codex app-server` per workspace and streams JSON-RPC events.
 
 ## Key Paths
 
