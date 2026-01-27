@@ -21,7 +21,8 @@
         "dragDropEnabled": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "transparent": true,
+        "transparent": false,
+        "backgroundColor": "#0c1016",
         "devtools": true
       }
     ],
