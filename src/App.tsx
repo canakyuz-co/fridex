@@ -124,6 +124,13 @@ const GitHubPanelData = lazy(() =>
 
 
 function MainApp() {
+  async function handleWorktreeCreated(
+    worktree: WorkspaceInfo,
+    _parentWorkspace?: WorkspaceInfo,
+  ) {
+    await worktreeSetupScriptState.maybeRunWorktreeSetupScript(worktree);
+  }
+
   const {
     appSettings,
     setAppSettings,
@@ -1402,13 +1409,6 @@ function MainApp() {
     onDebug: addDebugEntry,
   });
 
-  const handleWorktreeCreated = useCallback(
-    async (worktree: WorkspaceInfo, _parentWorkspace?: WorkspaceInfo) => {
-      await worktreeSetupScriptState.maybeRunWorktreeSetupScript(worktree);
-    },
-    [worktreeSetupScriptState],
-  );
-
   const { handleCycleAgent, handleCycleWorkspace } = useWorkspaceCycling({
     workspaces,
     groupedWorkspaces,
@@ -1981,7 +1981,7 @@ function MainApp() {
         onRenamePromptConfirm={handleRenamePromptConfirm}
         worktreePrompt={worktreePrompt}
         onWorktreePromptChange={updateWorktreeBranch}
-        onWorktreePromptSetupScriptChange={updateWorktreeSetupScript}
+        onWorktreeSetupScriptChange={updateWorktreeSetupScript}
         onWorktreePromptCancel={cancelWorktreePrompt}
         onWorktreePromptConfirm={confirmWorktreePrompt}
         clonePrompt={clonePrompt}
