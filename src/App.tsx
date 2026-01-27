@@ -58,7 +58,6 @@ import { useRenameWorktreePrompt } from "./features/workspaces/hooks/useRenameWo
 import { useLayoutController } from "./features/app/hooks/useLayoutController";
 import { useWindowLabel } from "./features/layout/hooks/useWindowLabel";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { FileTreePanel } from "./features/files/components/FileTreePanel";
 import {
   SidebarCollapseButton,
   TitlebarExpandControls,
@@ -1744,6 +1743,7 @@ function MainApp() {
     gitDiffLoading: activeDiffLoading,
     gitDiffError: activeDiffError,
     onDiffActivePathChange: handleActiveDiffPath,
+    onOpenFile: activeTab === "editor" ? editorState.openFile : undefined,
     commitMessage,
     commitMessageLoading,
     commitMessageError,
@@ -1912,27 +1912,7 @@ function MainApp() {
       onSavePath={editorState.saveFile}
     />
   );
-  const handleEditorPanelChange = useCallback(() => {}, []);
-  const editorSidebarNode =
-    activeWorkspace && activeWorkspaceId ? (
-      <FileTreePanel
-        workspaceId={activeWorkspaceId}
-        workspacePath={activeWorkspace.path}
-        files={files}
-        isLoading={isFilesLoading}
-        filePanelMode="files"
-        onFilePanelModeChange={handleEditorPanelChange}
-        showTabs={false}
-        showMentionActions={false}
-        onOpenFile={editorState.openFile}
-        openTargets={appSettings.openAppTargets}
-        openAppIconById={openAppIconById}
-        selectedOpenAppId={appSettings.selectedOpenAppId}
-        onSelectOpenAppId={handleSelectOpenAppId}
-      />
-    ) : (
-      sidebarNode
-    );
+  const editorSidebarNode = activeWorkspace ? gitDiffPanelNode : sidebarNode;
   const sidebarNodeForLayout =
     activeTab === "editor" ? editorSidebarNode : sidebarNode;
 

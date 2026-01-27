@@ -94,6 +94,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  background: #0d121b;
 }
 
 .editor-state {
@@ -111,6 +112,12 @@
   color: var(--text-muted);
   background: var(--surface-card-muted);
   border-bottom: 1px solid var(--border-muted);
+}
+
+.monaco-editor,
+.monaco-editor .margin,
+.monaco-editor-background {
+  background-color: #0d121b !important;
 }
 
 .editor-toggle {

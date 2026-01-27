@@ -112,6 +112,7 @@ export function EditorView({
 
   const handleMount = useCallback(
     (editorInstance: Monaco.editor.IStandaloneCodeEditor, monaco: Monaco) => {
+      monaco.editor.setTheme("friday-dark");
       editorInstance.addCommand(
         monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
         () => {

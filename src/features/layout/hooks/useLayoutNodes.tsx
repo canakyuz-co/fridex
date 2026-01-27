@@ -298,6 +298,7 @@ type LayoutNodesOptions = {
   gitDiffLoading: boolean;
   gitDiffError: string | null;
   onDiffActivePathChange?: (path: string) => void;
+  onOpenFile?: (path: string) => void;
   commitMessage: string;
   commitMessageLoading: boolean;
   commitMessageError: string | null;
@@ -689,6 +690,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
         filePanelMode={options.filePanelMode}
         onFilePanelModeChange={options.onFilePanelModeChange}
         onInsertText={options.onInsertComposerText}
+        onOpenFile={options.onOpenFile}
         openTargets={options.openAppTargets}
         openAppIconById={options.openAppIconById}
         selectedOpenAppId={options.selectedOpenAppId}
