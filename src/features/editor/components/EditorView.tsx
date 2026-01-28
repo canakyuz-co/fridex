@@ -7,7 +7,7 @@ import { EditorPlaceholder } from "./EditorPlaceholder";
 import "monaco-editor/esm/vs/basic-languages/css/css.contribution";
 import "monaco-editor/esm/vs/basic-languages/html/html.contribution";
 import "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution";
-import "monaco-editor/esm/vs/basic-languages/json/json.contribution";
+import "monaco-editor/esm/vs/basic-languages/json/json";
 import "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution";
 import "monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution";
 
