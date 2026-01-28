@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
+import { Markdown } from "../../messages/components/Markdown";
 import type {
   LocalUsageSnapshot,
   TaskEntry,
@@ -532,7 +533,10 @@ export function Home({
                         <span className="home-tasks-status">Doing</span>
                       )}
                       {task.content && (
-                        <span className="home-tasks-content">{task.content}</span>
+                        <Markdown
+                          value={task.content}
+                          className="home-tasks-content"
+                        />
                       )}
                     </div>
                     {editingTaskId === task.id && (
@@ -589,9 +593,10 @@ export function Home({
                         <div className="home-tasks-card" key={task.id}>
                           <div className="home-tasks-card-title">{task.title}</div>
                           {task.content && (
-                            <div className="home-tasks-card-content">
-                              {task.content}
-                            </div>
+                            <Markdown
+                              value={task.content}
+                              className="home-tasks-card-content"
+                            />
                           )}
                           {editingTaskId === task.id && (
                             <div className="home-tasks-edit">
