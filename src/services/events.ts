@@ -9,6 +9,13 @@ export type TerminalOutputEvent = {
   data: string;
 };
 
+export type LspNotificationEvent = {
+  workspaceId: string;
+  languageId: string;
+  method: string;
+  params: unknown;
+};
+
 type SubscriptionOptions = {
   onError?: (error: unknown) => void;
 };
@@ -79,6 +86,7 @@ function createEventHub<T>(eventName: string) {
 const appServerHub = createEventHub<AppServerEvent>("app-server-event");
 const dictationDownloadHub = createEventHub<DictationModelStatus>("dictation-download");
 const dictationEventHub = createEventHub<DictationEvent>("dictation-event");
+const lspNotificationHub = createEventHub<LspNotificationEvent>("lsp-notification");
 const terminalOutputHub = createEventHub<TerminalOutputEvent>("terminal-output");
 const updaterCheckHub = createEventHub<void>("updater-check");
 const menuNewAgentHub = createEventHub<void>("menu-new-agent");
@@ -124,6 +132,13 @@ export function subscribeDictationEvents(
   options?: SubscriptionOptions,
 ): Unsubscribe {
   return dictationEventHub.subscribe(onEvent, options);
+}
+
+export function subscribeLspNotifications(
+  onEvent: (event: LspNotificationEvent) => void,
+  options?: SubscriptionOptions,
+): Unsubscribe {
+  return lspNotificationHub.subscribe(onEvent, options);
 }
 
 export function subscribeTerminalOutput(

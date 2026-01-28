@@ -15,6 +15,7 @@ type EditorBuffer = {
 
 type UseEditorStateOptions = {
   workspaceId: string | null;
+  onDidSave?: (path: string) => void;
 };
 
 type UseEditorStateResult = {
@@ -59,6 +60,7 @@ function toMonacoLanguage(path: string): string | null {
 
 export function useEditorState({
   workspaceId,
+  onDidSave,
 }: UseEditorStateOptions): UseEditorStateResult {
   const [openPaths, setOpenPaths] = useState<string[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
@@ -197,6 +199,7 @@ export function useEditorState({
       void (async () => {
         try {
           await writeWorkspaceFile(workspaceId, path, buffer.content);
+          onDidSave?.(path);
           setBuffersByPath((prev) => {
             const current = prev[path];
             if (!current) {
@@ -231,7 +234,7 @@ export function useEditorState({
         }
       })();
     },
-    [workspaceId, buffersByPath],
+    [workspaceId, buffersByPath, onDidSave],
   );
 
   return {

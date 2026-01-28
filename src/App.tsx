@@ -77,6 +77,7 @@ import { useClonePrompt } from "./features/workspaces/hooks/useClonePrompt";
 import { useWorkspaceController } from "./features/app/hooks/useWorkspaceController";
 import { useWorkspaceSelection } from "./features/workspaces/hooks/useWorkspaceSelection";
 import { useEditorState } from "./features/editor/hooks/useEditorState";
+import { useEditorLsp } from "./features/editor/hooks/useEditorLsp";
 import { useLocalUsage } from "./features/home/hooks/useLocalUsage";
 import { useGitHubPanelController } from "./features/app/hooks/useGitHubPanelController";
 import { useSettingsModalState } from "./features/app/hooks/useSettingsModalState";
@@ -453,7 +454,20 @@ function MainApp() {
     activeWorkspace,
     onDebug: addDebugEntry,
   });
-  const editorState = useEditorState({ workspaceId: activeWorkspaceId });
+  const editorDidSaveRef = useRef<(path: string) => void>(() => {});
+  const editorState = useEditorState({
+    workspaceId: activeWorkspaceId,
+    onDidSave: (path) => editorDidSaveRef.current(path),
+  });
+  const editorLsp = useEditorLsp({
+    workspaceId: activeWorkspaceId,
+    workspacePath: activeWorkspace?.path ?? null,
+    openPaths: editorState.openPaths,
+    buffersByPath: editorState.buffersByPath,
+  });
+  useEffect(() => {
+    editorDidSaveRef.current = editorLsp.onDidSave;
+  }, [editorLsp.onDidSave]);
   const { branches, checkoutBranch, createBranch } = useGitBranches({
     activeWorkspace,
     onDebug: addDebugEntry
@@ -1910,6 +1924,7 @@ function MainApp() {
       onClosePath={editorState.closeFile}
       onContentChange={editorState.updateContent}
       onSavePath={editorState.saveFile}
+      onMonacoReady={editorLsp.onMonacoReady}
     />
   );
   const editorSidebarNode = activeWorkspace ? (

@@ -1,5 +1,6 @@
 import Editor from "@monaco-editor/react";
 import type { Monaco } from "@monaco-editor/react";
+import type { editor as MonacoEditor } from "monaco-editor";
 import Close from "lucide-react/dist/esm/icons/x";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { EditorPlaceholder } from "./EditorPlaceholder";
@@ -36,9 +37,13 @@ type EditorViewProps = {
   onClosePath: (path: string) => void;
   onContentChange: (path: string, value: string) => void;
   onSavePath: (path: string) => void;
+  onMonacoReady?: (
+    monaco: Monaco,
+    editor: MonacoEditor.IStandaloneCodeEditor,
+  ) => void;
 };
 
-function configureMonaco(monaco: Monaco) {
+function configureMonaco(_monaco: Monaco) {
   const globalScope = globalThis as typeof globalThis & {
     MonacoEnvironment?: { getWorker: (workerId: string, label: string) => Worker };
   };
@@ -73,6 +78,7 @@ export function EditorView({
   onClosePath,
   onContentChange,
   onSavePath,
+  onMonacoReady,
 }: EditorViewProps) {
   const activeBuffer = activePath ? buffersByPath[activePath] : null;
   const activePathRef = useRef(activePath);
@@ -173,13 +179,22 @@ export function EditorView({
 
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     configureMonaco(monaco);
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+    });
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+    });
     applyTheme(monaco);
   }, [applyTheme]);
 
   const handleMount = useCallback(
-    (editorInstance: Monaco.editor.IStandaloneCodeEditor, monaco: Monaco) => {
+    (editorInstance: MonacoEditor.IStandaloneCodeEditor, monaco: Monaco) => {
       monacoRef.current = monaco;
       applyTheme(monaco);
+      onMonacoReady?.(monaco, editorInstance);
       editorInstance.addCommand(
         monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
         () => {
@@ -190,7 +205,7 @@ export function EditorView({
         },
       );
     },
-    [applyTheme, onSavePath],
+    [applyTheme, onSavePath, onMonacoReady],
   );
 
   useEffect(() => {

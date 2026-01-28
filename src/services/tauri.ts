@@ -539,6 +539,38 @@ export async function writeWorkspaceFile(
   return invoke("write_workspace_file", { workspaceId, path, content });
 }
 
+export async function lspStart(
+  workspaceId: string,
+  languageId: string,
+): Promise<void> {
+  return invoke("lsp_start", { workspaceId, languageId });
+}
+
+export async function lspStop(
+  workspaceId: string,
+  languageId: string,
+): Promise<void> {
+  return invoke("lsp_stop", { workspaceId, languageId });
+}
+
+export async function lspRequest(
+  workspaceId: string,
+  languageId: string,
+  method: string,
+  params: Record<string, unknown>,
+): Promise<unknown> {
+  return invoke("lsp_request", { workspaceId, languageId, method, params });
+}
+
+export async function lspNotify(
+  workspaceId: string,
+  languageId: string,
+  method: string,
+  params: Record<string, unknown>,
+): Promise<void> {
+  return invoke("lsp_notify", { workspaceId, languageId, method, params });
+}
+
 export async function listGitBranches(workspaceId: string) {
   return invoke<any>("list_git_branches", { workspaceId });
 }

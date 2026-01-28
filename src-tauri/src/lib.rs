@@ -17,6 +17,7 @@ mod event_sink;
 mod git;
 mod git_utils;
 mod local_usage;
+mod lsp;
 mod menu;
 mod prompts;
 mod remote_backend;
@@ -175,6 +176,10 @@ pub fn run() {
             terminal::terminal_write,
             terminal::terminal_resize,
             terminal::terminal_close,
+            lsp::lsp_start,
+            lsp::lsp_stop,
+            lsp::lsp_request,
+            lsp::lsp_notify,
             dictation::dictation_model_status,
             dictation::dictation_download_model,
             dictation::dictation_cancel_download,

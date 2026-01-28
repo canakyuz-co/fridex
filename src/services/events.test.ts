@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import type { AppServerEvent } from "../types";
 import {
   subscribeAppServerEvents,
+  subscribeLspNotifications,
   subscribeMenuCycleCollaborationMode,
   subscribeMenuCycleModel,
   subscribeMenuNewAgent,
@@ -86,6 +87,35 @@ describe("events subscriptions", () => {
     };
     listener(event);
     expect(onEvent).toHaveBeenCalledTimes(1);
+
+    cleanup();
+  });
+
+  it("delivers LSP notifications to subscribers", async () => {
+    let listener: EventCallback<unknown> = () => {};
+    const unlisten = vi.fn();
+
+    vi.mocked(listen).mockImplementation((_event, handler) => {
+      listener = handler as EventCallback<unknown>;
+      return Promise.resolve(unlisten);
+    });
+
+    const onEvent = vi.fn();
+    const cleanup = subscribeLspNotifications(onEvent);
+
+    const payload = {
+      workspaceId: "ws-1",
+      languageId: "typescript",
+      method: "textDocument/publishDiagnostics",
+      params: { uri: "file:///demo.ts", diagnostics: [] },
+    };
+    const event: Event<typeof payload> = {
+      event: "lsp-notification",
+      id: 1,
+      payload,
+    };
+    listener(event);
+    expect(onEvent).toHaveBeenCalledWith(payload);
 
     cleanup();
   });

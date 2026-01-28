@@ -5,6 +5,7 @@ use tauri::{AppHandle, Manager};
 use tokio::sync::Mutex;
 
 use crate::dictation::DictationState;
+use crate::lsp::LspManager;
 use crate::storage::{read_settings, read_workspaces};
 use crate::types::{AppSettings, WorkspaceEntry};
 
@@ -18,6 +19,7 @@ pub(crate) struct AppState {
     pub(crate) settings_path: PathBuf,
     pub(crate) app_settings: Mutex<AppSettings>,
     pub(crate) dictation: Mutex<DictationState>,
+    pub(crate) lsp_manager: Mutex<LspManager>,
 }
 
 impl AppState {
@@ -39,6 +41,7 @@ impl AppState {
             settings_path,
             app_settings: Mutex::new(app_settings),
             dictation: Mutex::new(DictationState::default()),
+            lsp_manager: Mutex::new(LspManager::new()),
         }
     }
 }
