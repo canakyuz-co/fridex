@@ -30,16 +30,31 @@ type UseEditorStateResult = {
 
 function toMonacoLanguage(path: string): string | null {
   const language = languageFromPath(path);
+  if (!language) {
+    return "plaintext";
+  }
   if (language === "markup") {
     return "html";
   }
   if (language === "bash") {
     return "shell";
   }
+  if (language === "tsx" || language === "typescript") {
+    return "typescript";
+  }
+  if (language === "jsx" || language === "javascript") {
+    return "javascript";
+  }
+  if (language === "markdown") {
+    return "markdown";
+  }
+  if (language === "json") {
+    return "json";
+  }
   if (language === "text") {
     return "plaintext";
   }
-  return language;
+  return "plaintext";
 }
 
 export function useEditorState({
