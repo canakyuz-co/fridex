@@ -128,6 +128,7 @@ type OtherAiDraft = {
   label: string;
   provider: string;
   enabled: boolean;
+  apiKey: string;
   command: string;
   args: string;
   modelsText: string;
@@ -166,6 +167,7 @@ const buildOtherAiDrafts = (providers: AppSettings["otherAiProviders"]) =>
       label: provider.label ?? provider.id,
       provider: provider.provider,
       enabled: provider.enabled,
+      apiKey: provider.apiKey ?? "",
       command: provider.command ?? "",
       args: provider.args ?? "",
       modelsText: (provider.models ?? []).join("\n"),
@@ -793,6 +795,7 @@ export function SettingsView({
     ) => {
       const nextLabel = draft?.label ?? provider.label;
       const nextProvider = draft?.provider ?? provider.provider;
+      const nextApiKey = draft?.apiKey ?? provider.apiKey ?? "";
       const nextCommand = draft?.command ?? provider.command ?? "";
       const nextArgs = draft?.args ?? provider.args ?? "";
       const nextModelsText = draft?.modelsText ?? (provider.models ?? []).join("\n");
@@ -804,6 +807,7 @@ export function SettingsView({
           provider.provider,
         ),
         enabled: draft?.enabled ?? provider.enabled,
+        apiKey: normalizeTextValue(nextApiKey) ?? null,
         command: normalizeTextValue(nextCommand) ?? null,
         args: normalizeTextValue(nextArgs) ?? null,
         models: parseModelList(nextModelsText),
@@ -849,12 +853,20 @@ export function SettingsView({
     if (providerType === "custom") {
       return;
     }
+    const apiKey = (draft.apiKey ?? provider.apiKey ?? "").trim();
+    if (!apiKey) {
+      pushErrorToast({
+        title: "API key required",
+        message: `Enter an API key for ${providerType} to fetch models.`,
+      });
+      return;
+    }
     setOtherAiFetchState((prev) => ({
       ...prev,
       [provider.id]: { loading: true },
     }));
     try {
-      const models = await listOtherAiModels(providerType);
+      const models = await listOtherAiModels(providerType, apiKey);
       const normalized = Array.from(
         new Set(
           models
@@ -899,6 +911,7 @@ export function SettingsView({
       label: "Custom",
       provider: "custom",
       enabled: false,
+      apiKey: null,
       command: null,
       args: null,
       models: [],
@@ -3123,6 +3136,7 @@ export function SettingsView({
                     label: provider.label ?? provider.id,
                     provider: provider.provider,
                     enabled: provider.enabled,
+                    apiKey: provider.apiKey ?? "",
                     command: provider.command ?? "",
                     args: provider.args ?? "",
                     modelsText: (provider.models ?? []).join("\n"),
@@ -3187,6 +3201,25 @@ export function SettingsView({
                           </button>
                         )}
                       </div>
+                      {draft.provider !== "custom" && (
+                        <>
+                          <label className="settings-field-label">API Key</label>
+                          <input
+                            type="password"
+                            className="settings-input"
+                            value={draft.apiKey}
+                            placeholder={draft.provider === "claude" ? "sk-ant-..." : "AI..."}
+                            onChange={(event) =>
+                              handleOtherAiDraftChange(provider.id, {
+                                apiKey: event.target.value,
+                              })
+                            }
+                          />
+                          <div className="settings-help">
+                            Required for fetching models. Stored locally.
+                          </div>
+                        </>
+                      )}
                       <label className="settings-field-label">CLI command</label>
                       <div className="settings-field-row">
                         <input
@@ -3238,7 +3271,6 @@ export function SettingsView({
                       <div className="settings-help">
                         One model per line or comma-separated. These appear in the model picker.
                         Uses API discovery for Claude/Gemini when you fetch.
-                        Requires ANTHROPIC_API_KEY or GEMINI_API_KEY/GOOGLE_API_KEY in the environment.
                       </div>
                     </div>
                   );

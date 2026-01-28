@@ -318,6 +318,8 @@ pub(crate) struct OtherAiProvider {
     pub(crate) label: String,
     pub(crate) provider: String,
     pub(crate) enabled: bool,
+    #[serde(default, rename = "apiKey")]
+    pub(crate) api_key: Option<String>,
     #[serde(default)]
     pub(crate) command: Option<String>,
     #[serde(default)]
@@ -747,6 +749,7 @@ fn default_other_ai_providers() -> Vec<OtherAiProvider> {
             label: "Claude".to_string(),
             provider: "claude".to_string(),
             enabled: false,
+            api_key: None,
             command: Some("claude".to_string()),
             args: None,
             models: Vec::new(),
@@ -757,6 +760,7 @@ fn default_other_ai_providers() -> Vec<OtherAiProvider> {
             label: "Gemini".to_string(),
             provider: "gemini".to_string(),
             enabled: false,
+            api_key: None,
             command: Some("gemini".to_string()),
             args: None,
             models: Vec::new(),

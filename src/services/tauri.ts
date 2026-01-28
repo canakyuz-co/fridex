@@ -499,8 +499,8 @@ export async function updateAppSettings(settings: AppSettings): Promise<AppSetti
   return invoke<AppSettings>("update_app_settings", { settings });
 }
 
-export async function listOtherAiModels(provider: string): Promise<string[]> {
-  return invoke<string[]>("list_other_ai_models", { provider });
+export async function listOtherAiModels(provider: string, apiKey: string): Promise<string[]> {
+  return invoke<string[]>("list_other_ai_models", { provider, apiKey });
 }
 
 type MenuAcceleratorUpdate = {

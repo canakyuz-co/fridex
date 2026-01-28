@@ -180,6 +180,7 @@ export type OtherAiProvider = {
   label: string;
   provider: "claude" | "gemini" | "custom";
   enabled: boolean;
+  apiKey: string | null;
   command: string | null;
   args: string | null;
   models: string[];

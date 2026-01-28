@@ -1,10 +1,6 @@
 use reqwest::Client;
 use serde_json::Value;
 
-fn read_env(key: &str) -> Result<String, String> {
-    std::env::var(key).map_err(|_| format!("{key} is not set"))
-}
-
 fn collect_unique_models(items: Vec<String>) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
     let mut models = Vec::new();
@@ -20,8 +16,11 @@ fn collect_unique_models(items: Vec<String>) -> Vec<String> {
     models
 }
 
-async fn list_claude_models(client: &Client) -> Result<Vec<String>, String> {
-    let api_key = read_env("ANTHROPIC_API_KEY")?;
+async fn list_claude_models(client: &Client, api_key: &str) -> Result<Vec<String>, String> {
+    let api_key = api_key.trim();
+    if api_key.is_empty() {
+        return Err("API key is required".to_string());
+    }
     let response = client
         .get("https://api.anthropic.com/v1/models")
         .header("x-api-key", api_key)
@@ -53,10 +52,11 @@ async fn list_claude_models(client: &Client) -> Result<Vec<String>, String> {
     Ok(collect_unique_models(models))
 }
 
-async fn list_gemini_models(client: &Client) -> Result<Vec<String>, String> {
-    let api_key = std::env::var("GEMINI_API_KEY")
-        .or_else(|_| std::env::var("GOOGLE_API_KEY"))
-        .map_err(|_| "GEMINI_API_KEY or GOOGLE_API_KEY is not set".to_string())?;
+async fn list_gemini_models(client: &Client, api_key: &str) -> Result<Vec<String>, String> {
+    let api_key = api_key.trim();
+    if api_key.is_empty() {
+        return Err("API key is required".to_string());
+    }
     let response = client
         .get("https://generativelanguage.googleapis.com/v1beta/models")
         .query(&[("key", api_key)])
@@ -88,12 +88,15 @@ async fn list_gemini_models(client: &Client) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-pub(crate) async fn list_other_ai_models(provider: String) -> Result<Vec<String>, String> {
+pub(crate) async fn list_other_ai_models(
+    provider: String,
+    api_key: String,
+) -> Result<Vec<String>, String> {
     let normalized = provider.trim().to_lowercase();
     let client = Client::new();
     match normalized.as_str() {
-        "claude" => list_claude_models(&client).await,
-        "gemini" => list_gemini_models(&client).await,
+        "claude" => list_claude_models(&client, &api_key).await,
+        "gemini" => list_gemini_models(&client, &api_key).await,
         _ => Err("Unsupported provider".to_string()),
     }
 }
