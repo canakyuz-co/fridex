@@ -750,7 +750,7 @@ fn default_other_ai_providers() -> Vec<OtherAiProvider> {
             command: Some("claude".to_string()),
             args: None,
             models: Vec::new(),
-            default_model: None,
+            default_model: Some("claude4.5".to_string()),
         },
         OtherAiProvider {
             id: "gemini".to_string(),
@@ -760,7 +760,7 @@ fn default_other_ai_providers() -> Vec<OtherAiProvider> {
             command: Some("gemini".to_string()),
             args: None,
             models: Vec::new(),
-            default_model: None,
+            default_model: Some("gemini3".to_string()),
         },
     ]
 }

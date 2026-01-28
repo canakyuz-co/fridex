@@ -52,6 +52,24 @@ function toMonacoLanguage(path: string): string | null {
   if (language === "json") {
     return "json";
   }
+  if (language === "yaml") {
+    return "yaml";
+  }
+  if (language === "sql") {
+    return "sql";
+  }
+  if (language === "graphql") {
+    return "graphql";
+  }
+  if (language === "prisma") {
+    return "prisma";
+  }
+  if (language === "terraform") {
+    return "terraform";
+  }
+  if (language === "dockerfile") {
+    return "dockerfile";
+  }
   if (language === "text") {
     return "plaintext";
   }

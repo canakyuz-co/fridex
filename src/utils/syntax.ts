@@ -26,6 +26,7 @@ const EXTENSION_TO_LANGUAGE: Record<string, string> = {
   c: "c",
   cpp: "cpp",
   css: "css",
+  gql: "graphql",
   go: "go",
   h: "c",
   hpp: "cpp",
@@ -37,17 +38,28 @@ const EXTENSION_TO_LANGUAGE: Record<string, string> = {
   kt: "kotlin",
   md: "markdown",
   mjs: "javascript",
+  php: "php",
+  prisma: "prisma",
   rs: "rust",
   sass: "scss",
   scss: "scss",
+  sql: "sql",
   sh: "bash",
   swift: "swift",
+  tf: "terraform",
+  tfvars: "terraform",
   toml: "toml",
   ts: "typescript",
   tsx: "tsx",
   txt: "text",
+  xml: "xml",
   yaml: "yaml",
   yml: "yaml",
+  lua: "lua",
+  rb: "ruby",
+  rake: "ruby",
+  graphql: "graphql",
+  hcl: "terraform",
 };
 
 function escapeHtml(value: string) {
@@ -62,6 +74,10 @@ export function languageFromPath(path?: string | null) {
     return null;
   }
   const fileName = path.split("/").pop() ?? path;
+  const lowerFile = fileName.toLowerCase();
+  if (lowerFile === "dockerfile" || lowerFile.startsWith("dockerfile.")) {
+    return "dockerfile";
+  }
   const dotIndex = fileName.lastIndexOf(".");
   if (dotIndex <= 0 || dotIndex === fileName.length - 1) {
     return null;

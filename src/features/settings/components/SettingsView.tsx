@@ -148,6 +148,15 @@ const parseModelList = (value: string) =>
     ),
   );
 
+const DEFAULT_OTHER_AI_MODEL: Record<
+  AppSettings["otherAiProviders"][number]["provider"],
+  string
+> = {
+  claude: "claude4.5",
+  gemini: "gemini3",
+  custom: "",
+};
+
 const normalizeProviderType = (
   value: string,
   fallback: AppSettings["otherAiProviders"][number]["provider"],
@@ -838,6 +847,29 @@ export function SettingsView({
       ...prev,
       [id]: { ...(prev[id] ?? buildOtherAiDrafts(appSettings.otherAiProviders)[id]), ...updates },
     }));
+  };
+
+  const applyOtherAiEnableDefaults = (
+    provider: AppSettings["otherAiProviders"][number],
+    draft: OtherAiDraft,
+    enabled: boolean,
+  ) => {
+    if (!enabled) {
+      return draft;
+    }
+    const providerType = normalizeProviderType(draft.provider, provider.provider);
+    if (draft.defaultModel.trim()) {
+      return draft;
+    }
+    const fallback = DEFAULT_OTHER_AI_MODEL[providerType];
+    if (!fallback) {
+      return draft;
+    }
+    return {
+      ...draft,
+      provider: providerType,
+      defaultModel: fallback,
+    };
   };
 
   const handleSaveOtherAiProviders = async () => {
@@ -3103,11 +3135,18 @@ export function SettingsView({
                         <button
                           type="button"
                           className={`settings-toggle ${draft.enabled ? "on" : ""}`}
-                          onClick={() =>
-                            handleOtherAiDraftChange(provider.id, {
-                              enabled: !draft.enabled,
-                            })
-                          }
+                          onClick={() => {
+                            const nextEnabled = !draft.enabled;
+                            const nextDraft = applyOtherAiEnableDefaults(
+                              provider,
+                              draft,
+                              nextEnabled,
+                            );
+                            setOtherAiDrafts((prev) => ({
+                              ...prev,
+                              [provider.id]: { ...nextDraft, enabled: nextEnabled },
+                            }));
+                          }}
                         >
                           <span className="settings-toggle-knob" />
                         </button>

@@ -74,9 +74,21 @@ const SUPPORTED_LANGUAGES = new Set([
   "rust",
   "python",
   "go",
+  "terraform",
+  "sql",
   "yaml",
   "toml",
+  "xml",
+  "lua",
+  "graphql",
+  "prisma",
+  "ruby",
+  "c",
+  "cpp",
+  "dockerfile",
   "shell",
+  "swift",
+  "php",
 ]);
 
 function normalizePath(value: string): string {
@@ -101,7 +113,10 @@ function toWorkspaceName(path: string): string {
 }
 
 function resolveLanguageId(path: string, buffer?: EditorBuffer | null): string | null {
-  const raw = buffer?.language ?? languageFromPath(path);
+  const raw =
+    buffer?.language && buffer.language !== "plaintext"
+      ? buffer.language
+      : languageFromPath(path);
   if (!raw) {
     return null;
   }
