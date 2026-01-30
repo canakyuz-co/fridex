@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tokio::sync::Mutex;
+use tokio::sync::oneshot;
 
 use crate::dictation::DictationState;
 use crate::lsp::LspManager;
@@ -20,6 +21,7 @@ pub(crate) struct AppState {
     pub(crate) app_settings: Mutex<AppSettings>,
     pub(crate) dictation: Mutex<DictationState>,
     pub(crate) lsp_manager: Mutex<LspManager>,
+    pub(crate) codex_login_cancels: Mutex<HashMap<String, oneshot::Sender<()>>>,
 }
 
 impl AppState {
@@ -42,6 +44,7 @@ impl AppState {
             app_settings: Mutex::new(app_settings),
             dictation: Mutex::new(DictationState::default()),
             lsp_manager: Mutex::new(LspManager::new()),
+            codex_login_cancels: Mutex::new(HashMap::new()),
         }
     }
 }

@@ -59,6 +59,7 @@ export function useThreadEventHandlers({
     onItemStarted,
     onItemCompleted,
     onReasoningSummaryDelta,
+    onReasoningSummaryBoundary,
     onReasoningTextDelta,
     onCommandOutputDelta,
     onTerminalInteraction,
@@ -81,6 +82,7 @@ export function useThreadEventHandlers({
     onThreadTokenUsageUpdated,
     onAccountRateLimitsUpdated,
     onTurnError,
+    onContextCompacted,
   } = useThreadTurnEvents({
     dispatch,
     markProcessing,
@@ -89,6 +91,7 @@ export function useThreadEventHandlers({
     pendingInterruptsRef,
     pushThreadErrorMessage,
     safeMessageActivity,
+    recordThreadActivity,
   });
 
   const onAppServerEvent = useCallback(
@@ -117,6 +120,7 @@ export function useThreadEventHandlers({
       onItemStarted,
       onItemCompleted,
       onReasoningSummaryDelta,
+      onReasoningSummaryBoundary,
       onReasoningTextDelta,
       onCommandOutputDelta,
       onTerminalInteraction,
@@ -127,6 +131,7 @@ export function useThreadEventHandlers({
       onThreadTokenUsageUpdated,
       onAccountRateLimitsUpdated,
       onTurnError,
+      onContextCompacted,
     }),
     [
       onWorkspaceConnected,
@@ -138,6 +143,7 @@ export function useThreadEventHandlers({
       onItemStarted,
       onItemCompleted,
       onReasoningSummaryDelta,
+      onReasoningSummaryBoundary,
       onReasoningTextDelta,
       onCommandOutputDelta,
       onTerminalInteraction,
@@ -148,6 +154,7 @@ export function useThreadEventHandlers({
       onThreadTokenUsageUpdated,
       onAccountRateLimitsUpdated,
       onTurnError,
+      onContextCompacted,
     ],
   );
 

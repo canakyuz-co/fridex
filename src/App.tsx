@@ -11,6 +11,7 @@ import "./styles/error-toasts.css";
 import "./styles/request-user-input.css";
 import "./styles/update-toasts.css";
 import "./styles/composer.css";
+import "./styles/review-inline.css";
 import "./styles/diff.css";
 import "./styles/diff-viewer.css";
 import "./styles/file-tree.css";
@@ -115,6 +116,8 @@ import type { ClaudeUsage } from "./services/tauri";
 import { OPEN_APP_STORAGE_KEY } from "./features/app/constants";
 import { useOpenAppIcons } from "./features/app/hooks/useOpenAppIcons";
 import { DEFAULT_RATE_LIMIT_KEY } from "./features/threads/hooks/useThreadsReducer";
+import { useCodeCssVars } from "./features/app/hooks/useCodeCssVars";
+import { useAccountSwitching } from "./features/app/hooks/useAccountSwitching";
 
 const AboutView = lazy(() =>
   import("./features/about/components/AboutView").then((module) => ({
@@ -205,6 +208,7 @@ function MainApp() {
     scaleShortcutText,
     queueSaveSettings,
   } = useAppSettingsController();
+  useCodeCssVars(appSettings);
   const {
     dictationModel,
     dictationState,
@@ -709,6 +713,7 @@ function MainApp() {
     tokenUsageByThread,
     rateLimitsByWorkspace,
     rateLimitsByWorkspaceModel,
+    accountByWorkspace,
     planByThread,
     lastAgentMessageByThread,
     interruptTurn,
@@ -726,9 +731,32 @@ function MainApp() {
     sendUserMessage,
     sendUserMessageToThread,
     startReview,
+    startResume,
+    startStatus,
+    reviewPrompt,
+    closeReviewPrompt,
+    showPresetStep,
+    choosePreset,
+    highlightedPresetIndex,
+    setHighlightedPresetIndex,
+    highlightedBranchIndex,
+    setHighlightedBranchIndex,
+    highlightedCommitIndex,
+    setHighlightedCommitIndex,
+    handleReviewPromptKeyDown,
+    confirmBranch,
+    selectBranch,
+    selectBranchAtIndex,
+    selectCommit,
+    selectCommitAtIndex,
+    confirmCommit,
+    updateCustomInstructions,
+    confirmCustom,
     handleApprovalDecision,
     handleApprovalRemember,
     handleUserInputSubmit,
+    refreshAccountInfo,
+    refreshAccountRateLimits,
   } = useThreads({
     activeWorkspace,
     onWorkspaceConnected: markWorkspaceConnected,
@@ -742,6 +770,18 @@ function MainApp() {
     otherAiProviders: appSettings.otherAiProviders,
     onMessageActivity: queueGitStatusRefresh,
     onClaudeUsage: handleClaudeUsage,
+  });
+  const {
+    activeAccount,
+    accountSwitching,
+    handleSwitchAccount,
+    handleCancelSwitchAccount,
+  } = useAccountSwitching({
+    activeWorkspaceId,
+    accountByWorkspace,
+    refreshAccountInfo,
+    refreshAccountRateLimits,
+    alertError,
   });
   const activeThreadIdRef = useRef<string | null>(activeThreadId ?? null);
   const { getThreadRows } = useThreadRows(threadParentById);
@@ -1094,8 +1134,12 @@ function MainApp() {
     isReviewing,
     steerEnabled: appSettings.experimentalSteerEnabled,
     connectWorkspace,
+    startThreadForWorkspace,
     sendUserMessage,
+    sendUserMessageToThread,
     startReview,
+    startResume,
+    startStatus,
   });
 
   const handleInsertComposerText = useComposerInsert({
@@ -1680,6 +1724,11 @@ const {
     activeRateLimits,
     claudeUsage: isOtherAiModel ? claudeUsage : null,
     isOtherAiModel,
+    usageShowRemaining: appSettings.usageShowRemaining,
+    accountInfo: activeAccount,
+    onSwitchAccount: handleSwitchAccount,
+    onCancelSwitchAccount: handleCancelSwitchAccount,
+    accountSwitching,
     codeBlockCopyUseModifier: appSettings.composerCodeBlockCopyUseModifier,
     openAppTargets: appSettings.openAppTargets,
     openAppIconById,
@@ -1956,6 +2005,25 @@ const {
     isReviewing,
     isProcessing,
     steerEnabled: appSettings.experimentalSteerEnabled,
+    reviewPrompt,
+    onReviewPromptClose: closeReviewPrompt,
+    onReviewPromptShowPreset: showPresetStep,
+    onReviewPromptChoosePreset: choosePreset,
+    highlightedPresetIndex,
+    onReviewPromptHighlightPreset: setHighlightedPresetIndex,
+    highlightedBranchIndex,
+    onReviewPromptHighlightBranch: setHighlightedBranchIndex,
+    highlightedCommitIndex,
+    onReviewPromptHighlightCommit: setHighlightedCommitIndex,
+    onReviewPromptKeyDown: handleReviewPromptKeyDown,
+    onReviewPromptSelectBranch: selectBranch,
+    onReviewPromptSelectBranchAtIndex: selectBranchAtIndex,
+    onReviewPromptConfirmBranch: confirmBranch,
+    onReviewPromptSelectCommit: selectCommit,
+    onReviewPromptSelectCommitAtIndex: selectCommitAtIndex,
+    onReviewPromptConfirmCommit: confirmCommit,
+    onReviewPromptUpdateCustomInstructions: updateCustomInstructions,
+    onReviewPromptConfirmCustom: confirmCustom,
     activeTokenUsage,
     activeQueue,
     draftText: activeDraft,

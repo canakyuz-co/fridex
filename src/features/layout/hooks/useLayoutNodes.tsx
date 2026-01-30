@@ -18,6 +18,7 @@ import { TabBar } from "../../app/components/TabBar";
 import { TabletNav } from "../../app/components/TabletNav";
 import { TerminalDock } from "../../terminal/components/TerminalDock";
 import { TerminalPanel } from "../../terminal/components/TerminalPanel";
+import type { ReviewPromptState, ReviewPromptStep } from "../../threads/hooks/useReviewPrompt";
 import type {
   AccessMode,
   ApprovalRequest,
@@ -27,6 +28,7 @@ import type {
   ConversationItem,
   ComposerEditorSettings,
   CustomPromptOption,
+  AccountSnapshot,
   DebugEntry,
   DictationSessionState,
   DictationTranscript,
@@ -115,6 +117,11 @@ type LayoutNodesOptions = {
   activeRateLimits: RateLimitSnapshot | null;
   claudeUsage?: ClaudeUsageSnapshot | null;
   isOtherAiModel?: boolean;
+  usageShowRemaining: boolean;
+  accountInfo: AccountSnapshot | null;
+  onSwitchAccount: () => void;
+  onCancelSwitchAccount: () => void;
+  accountSwitching: boolean;
   codeBlockCopyUseModifier: boolean;
   openAppTargets: OpenAppTarget[];
   openAppIconById: Record<string, string>;
@@ -347,6 +354,31 @@ type LayoutNodesOptions = {
   isReviewing: boolean;
   isProcessing: boolean;
   steerEnabled: boolean;
+  reviewPrompt: ReviewPromptState;
+  onReviewPromptClose: () => void;
+  onReviewPromptShowPreset: () => void;
+  onReviewPromptChoosePreset: (
+    preset: Exclude<ReviewPromptStep, "preset"> | "uncommitted",
+  ) => void;
+  highlightedPresetIndex: number;
+  onReviewPromptHighlightPreset: (index: number) => void;
+  highlightedBranchIndex: number;
+  onReviewPromptHighlightBranch: (index: number) => void;
+  highlightedCommitIndex: number;
+  onReviewPromptHighlightCommit: (index: number) => void;
+  onReviewPromptKeyDown: (event: {
+    key: string;
+    shiftKey?: boolean;
+    preventDefault: () => void;
+  }) => boolean;
+  onReviewPromptSelectBranch: (value: string) => void;
+  onReviewPromptSelectBranchAtIndex: (index: number) => void;
+  onReviewPromptConfirmBranch: () => Promise<void>;
+  onReviewPromptSelectCommit: (sha: string, title: string) => void;
+  onReviewPromptSelectCommitAtIndex: (index: number) => void;
+  onReviewPromptConfirmCommit: () => Promise<void>;
+  onReviewPromptUpdateCustomInstructions: (value: string) => void;
+  onReviewPromptConfirmCustom: () => Promise<void>;
   activeTokenUsage: ThreadTokenUsage | null;
   activeQueue: QueuedMessage[];
   draftText: string;
@@ -456,6 +488,11 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       accountRateLimits={options.activeRateLimits}
       claudeUsage={options.claudeUsage}
       isOtherAiModel={options.isOtherAiModel}
+      usageShowRemaining={options.usageShowRemaining}
+      accountInfo={options.accountInfo}
+      onSwitchAccount={options.onSwitchAccount}
+      onCancelSwitchAccount={options.onCancelSwitchAccount}
+      accountSwitching={options.accountSwitching}
       onOpenSettings={options.onOpenSettings}
       onOpenDebug={options.onOpenDebug}
       showDebugButton={options.showDebugButton}
@@ -567,6 +604,25 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       onDismissDictationError={options.onDismissDictationError}
       dictationHint={options.dictationHint}
       onDismissDictationHint={options.onDismissDictationHint}
+      reviewPrompt={options.reviewPrompt}
+      onReviewPromptClose={options.onReviewPromptClose}
+      onReviewPromptShowPreset={options.onReviewPromptShowPreset}
+      onReviewPromptChoosePreset={options.onReviewPromptChoosePreset}
+      highlightedPresetIndex={options.highlightedPresetIndex}
+      onReviewPromptHighlightPreset={options.onReviewPromptHighlightPreset}
+      highlightedBranchIndex={options.highlightedBranchIndex}
+      onReviewPromptHighlightBranch={options.onReviewPromptHighlightBranch}
+      highlightedCommitIndex={options.highlightedCommitIndex}
+      onReviewPromptHighlightCommit={options.onReviewPromptHighlightCommit}
+      onReviewPromptKeyDown={options.onReviewPromptKeyDown}
+      onReviewPromptSelectBranch={options.onReviewPromptSelectBranch}
+      onReviewPromptSelectBranchAtIndex={options.onReviewPromptSelectBranchAtIndex}
+      onReviewPromptConfirmBranch={options.onReviewPromptConfirmBranch}
+      onReviewPromptSelectCommit={options.onReviewPromptSelectCommit}
+      onReviewPromptSelectCommitAtIndex={options.onReviewPromptSelectCommitAtIndex}
+      onReviewPromptConfirmCommit={options.onReviewPromptConfirmCommit}
+      onReviewPromptUpdateCustomInstructions={options.onReviewPromptUpdateCustomInstructions}
+      onReviewPromptConfirmCustom={options.onReviewPromptConfirmCustom}
     />
   ) : null;
 

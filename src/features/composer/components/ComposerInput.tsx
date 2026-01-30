@@ -6,9 +6,18 @@ import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import Mic from "lucide-react/dist/esm/icons/mic";
 import Square from "lucide-react/dist/esm/icons/square";
+import Brain from "lucide-react/dist/esm/icons/brain";
+import PlusCircle from "lucide-react/dist/esm/icons/plus-circle";
+import Info from "lucide-react/dist/esm/icons/info";
+import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
+import ScrollText from "lucide-react/dist/esm/icons/scroll-text";
+import Wrench from "lucide-react/dist/esm/icons/wrench";
+import FileText from "lucide-react/dist/esm/icons/file-text";
 import { useComposerImageDrop } from "../hooks/useComposerImageDrop";
 import { ComposerAttachments } from "./ComposerAttachments";
 import { DictationWaveform } from "../../dictation/components/DictationWaveform";
+import { ReviewInlinePrompt } from "./ReviewInlinePrompt";
+import type { ReviewPromptState, ReviewPromptStep } from "../../threads/hooks/useReviewPrompt";
 
 type ComposerInputProps = {
   text: string;
@@ -45,6 +54,26 @@ type ComposerInputProps = {
   onHighlightIndex: (index: number) => void;
   onSelectSuggestion: (item: AutocompleteItem) => void;
   suggestionsStyle?: React.CSSProperties;
+  reviewPrompt?: ReviewPromptState;
+  onReviewPromptClose?: () => void;
+  onReviewPromptShowPreset?: () => void;
+  onReviewPromptChoosePreset?: (
+    preset: Exclude<ReviewPromptStep, "preset"> | "uncommitted",
+  ) => void;
+  highlightedPresetIndex?: number;
+  onReviewPromptHighlightPreset?: (index: number) => void;
+  highlightedBranchIndex?: number;
+  onReviewPromptHighlightBranch?: (index: number) => void;
+  highlightedCommitIndex?: number;
+  onReviewPromptHighlightCommit?: (index: number) => void;
+  onReviewPromptSelectBranch?: (value: string) => void;
+  onReviewPromptSelectBranchAtIndex?: (index: number) => void;
+  onReviewPromptConfirmBranch?: () => Promise<void>;
+  onReviewPromptSelectCommit?: (sha: string, title: string) => void;
+  onReviewPromptSelectCommitAtIndex?: (index: number) => void;
+  onReviewPromptConfirmCommit?: () => Promise<void>;
+  onReviewPromptUpdateCustomInstructions?: (value: string) => void;
+  onReviewPromptConfirmCustom?: () => Promise<void>;
 };
 
 export function ComposerInput({
@@ -82,13 +111,53 @@ export function ComposerInput({
   onHighlightIndex,
   onSelectSuggestion,
   suggestionsStyle,
+  reviewPrompt,
+  onReviewPromptClose,
+  onReviewPromptShowPreset,
+  onReviewPromptChoosePreset,
+  highlightedPresetIndex,
+  onReviewPromptHighlightPreset,
+  highlightedBranchIndex,
+  onReviewPromptHighlightBranch,
+  highlightedCommitIndex,
+  onReviewPromptHighlightCommit,
+  onReviewPromptSelectBranch,
+  onReviewPromptSelectBranchAtIndex,
+  onReviewPromptConfirmBranch,
+  onReviewPromptSelectCommit,
+  onReviewPromptSelectCommitAtIndex,
+  onReviewPromptConfirmCommit,
+  onReviewPromptUpdateCustomInstructions,
+  onReviewPromptConfirmCustom,
 }: ComposerInputProps) {
   const suggestionListRef = useRef<HTMLDivElement | null>(null);
   const suggestionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const minTextareaHeight = isExpanded ? 180 : 60;
   const maxTextareaHeight = isExpanded ? 320 : 120;
+  const reviewPromptOpen = Boolean(reviewPrompt);
   const isFileSuggestion = (item: AutocompleteItem) =>
     item.label.includes("/") || item.label.includes("\\");
+  const suggestionIcon = (item: AutocompleteItem) => {
+    if (isFileSuggestion(item)) {
+      return FileText;
+    }
+    if (item.id === "review") {
+      return Brain;
+    }
+    if (item.id === "new") {
+      return PlusCircle;
+    }
+    if (item.id === "resume") {
+      return RotateCcw;
+    }
+    if (item.id === "status") {
+      return Info;
+    }
+    if (item.id.startsWith("prompt:")) {
+      return ScrollText;
+    }
+    return Wrench;
+  };
   const fileTitle = (path: string) => {
     const normalized = path.replace(/\\/g, "/");
     const parts = normalized.split("/").filter(Boolean);
@@ -108,7 +177,7 @@ export function ComposerInput({
   });
 
   useEffect(() => {
-    if (!suggestionsOpen) {
+    if (!suggestionsOpen || suggestions.length === 0) {
       return;
     }
     const list = suggestionListRef.current;
@@ -274,53 +343,98 @@ export function ComposerInput({
         )}
         {suggestionsOpen && (
           <div
-            className="composer-suggestions popover-surface"
+            className={`composer-suggestions popover-surface${
+              reviewPromptOpen ? " review-inline-suggestions" : ""
+            }`}
             role="listbox"
             ref={suggestionListRef}
             style={suggestionsStyle}
           >
-            {suggestions.map((item, index) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`composer-suggestion${
-                  index === highlightIndex ? " is-active" : ""
-                }`}
-                role="option"
-                aria-selected={index === highlightIndex}
-                ref={(node) => {
-                  suggestionRefs.current[index] = node;
-                }}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => onSelectSuggestion(item)}
-                onMouseEnter={() => onHighlightIndex(index)}
-              >
-                {isFileSuggestion(item) ? (
-                  <>
-                    <span className="composer-suggestion-title">
-                      {fileTitle(item.label)}
-                    </span>
-                    <span className="composer-suggestion-description">
-                      {item.label}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="composer-suggestion-title">{item.label}</span>
-                    {item.description && (
-                      <span className="composer-suggestion-description">
-                        {item.description}
+            {reviewPromptOpen &&
+            reviewPrompt &&
+            onReviewPromptClose &&
+            onReviewPromptShowPreset &&
+            onReviewPromptChoosePreset &&
+            highlightedPresetIndex !== undefined &&
+            onReviewPromptHighlightPreset &&
+            highlightedBranchIndex !== undefined &&
+            onReviewPromptHighlightBranch &&
+            highlightedCommitIndex !== undefined &&
+            onReviewPromptHighlightCommit &&
+            onReviewPromptSelectBranch &&
+            onReviewPromptSelectBranchAtIndex &&
+            onReviewPromptConfirmBranch &&
+            onReviewPromptSelectCommit &&
+            onReviewPromptSelectCommitAtIndex &&
+            onReviewPromptConfirmCommit &&
+            onReviewPromptUpdateCustomInstructions &&
+            onReviewPromptConfirmCustom ? (
+              <ReviewInlinePrompt
+                reviewPrompt={reviewPrompt}
+                onClose={onReviewPromptClose}
+                onShowPreset={onReviewPromptShowPreset}
+                onChoosePreset={onReviewPromptChoosePreset}
+                highlightedPresetIndex={highlightedPresetIndex}
+                onHighlightPreset={onReviewPromptHighlightPreset}
+                highlightedBranchIndex={highlightedBranchIndex}
+                onHighlightBranch={onReviewPromptHighlightBranch}
+                highlightedCommitIndex={highlightedCommitIndex}
+                onHighlightCommit={onReviewPromptHighlightCommit}
+                onSelectBranch={onReviewPromptSelectBranch}
+                onSelectBranchAtIndex={onReviewPromptSelectBranchAtIndex}
+                onConfirmBranch={onReviewPromptConfirmBranch}
+                onSelectCommit={onReviewPromptSelectCommit}
+                onSelectCommitAtIndex={onReviewPromptSelectCommitAtIndex}
+                onConfirmCommit={onReviewPromptConfirmCommit}
+                onUpdateCustomInstructions={onReviewPromptUpdateCustomInstructions}
+                onConfirmCustom={onReviewPromptConfirmCustom}
+              />
+            ) : (
+              suggestions.map((item, index) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`composer-suggestion${
+                    index === highlightIndex ? " is-active" : ""
+                  }`}
+                  role="option"
+                  aria-selected={index === highlightIndex}
+                  ref={(node) => {
+                    suggestionRefs.current[index] = node;
+                  }}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => onSelectSuggestion(item)}
+                  onMouseEnter={() => onHighlightIndex(index)}
+                >
+                  {(() => {
+                    const Icon = suggestionIcon(item);
+                    const fileSuggestion = isFileSuggestion(item);
+                    const title = fileSuggestion ? fileTitle(item.label) : item.label;
+                    const description = fileSuggestion ? item.label : item.description;
+                    return (
+                      <span className="composer-suggestion-row">
+                        <span className="composer-suggestion-icon" aria-hidden>
+                          <Icon size={14} />
+                        </span>
+                        <span className="composer-suggestion-content">
+                          <span className="composer-suggestion-title">{title}</span>
+                          {description && (
+                            <span className="composer-suggestion-description">
+                              {description}
+                            </span>
+                          )}
+                          {!fileSuggestion && item.hint && (
+                            <span className="composer-suggestion-description">
+                              {item.hint}
+                            </span>
+                          )}
+                        </span>
                       </span>
-                    )}
-                    {item.hint && (
-                      <span className="composer-suggestion-description">
-                        {item.hint}
-                      </span>
-                    )}
-                  </>
-                )}
-              </button>
-            ))}
+                    );
+                  })()}
+                </button>
+              ))
+            )}
           </div>
         )}
       </div>

@@ -29,6 +29,7 @@ type AppServerEventHandlers = {
   onAppServerEvent?: (event: AppServerEvent) => void;
   onTurnStarted?: (workspaceId: string, threadId: string, turnId: string) => void;
   onTurnCompleted?: (workspaceId: string, threadId: string, turnId: string) => void;
+  onContextCompacted?: (workspaceId: string, threadId: string, turnId: string) => void;
   onTurnError?: (
     workspaceId: string,
     threadId: string,
@@ -44,6 +45,7 @@ type AppServerEventHandlers = {
   onItemStarted?: (workspaceId: string, threadId: string, item: Record<string, unknown>) => void;
   onItemCompleted?: (workspaceId: string, threadId: string, item: Record<string, unknown>) => void;
   onReasoningSummaryDelta?: (workspaceId: string, threadId: string, itemId: string, delta: string) => void;
+  onReasoningSummaryBoundary?: (workspaceId: string, threadId: string, itemId: string) => void;
   onReasoningTextDelta?: (workspaceId: string, threadId: string, itemId: string, delta: string) => void;
   onCommandOutputDelta?: (workspaceId: string, threadId: string, itemId: string, delta: string) => void;
   onTerminalInteraction?: (
@@ -191,6 +193,16 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
         return;
       }
 
+      if (method === "thread/compacted") {
+        const params = message.params as Record<string, unknown>;
+        const threadId = String(params.threadId ?? params.thread_id ?? "");
+        const turnId = String(params.turnId ?? params.turn_id ?? "");
+        if (threadId && turnId) {
+          handlers.onContextCompacted?.(workspace_id, threadId, turnId);
+        }
+        return;
+      }
+
       if (method === "turn/plan/updated") {
         const params = message.params as Record<string, unknown>;
         const threadId = String(params.threadId ?? params.thread_id ?? "");
@@ -282,6 +294,16 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
         const delta = String(params.delta ?? "");
         if (threadId && itemId && delta) {
           handlers.onReasoningSummaryDelta?.(workspace_id, threadId, itemId, delta);
+        }
+        return;
+      }
+
+      if (method === "item/reasoning/summaryPartAdded") {
+        const params = message.params as Record<string, unknown>;
+        const threadId = String(params.threadId ?? params.thread_id ?? "");
+        const itemId = String(params.itemId ?? params.item_id ?? "");
+        if (threadId && itemId) {
+          handlers.onReasoningSummaryBoundary?.(workspace_id, threadId, itemId);
         }
         return;
       }

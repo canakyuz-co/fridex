@@ -1,4 +1,5 @@
 import type {
+  AccountSnapshot,
   ApprovalRequest,
   ConversationItem,
   RateLimitSnapshot,
@@ -132,6 +133,7 @@ export type ThreadState = {
   tokenUsageByThread: Record<string, ThreadTokenUsage>;
   rateLimitsByWorkspace: Record<string, RateLimitSnapshot | null>;
   rateLimitsByWorkspaceModel: Record<string, Record<string, RateLimitSnapshot | null>>;
+  accountByWorkspace: Record<string, AccountSnapshot | null>;
   planByThread: Record<string, TurnPlan | null>;
   lastAgentMessageByThread: Record<string, { text: string; timestamp: number }>;
 };
@@ -187,6 +189,16 @@ export type ThreadAction =
       itemId: string;
       delta: string;
     }
+  | {
+      type: "appendReasoningSummaryBoundary";
+      threadId: string;
+      itemId: string;
+    }
+  | {
+      type: "appendContextCompacted";
+      threadId: string;
+      turnId: string;
+    }
   | { type: "appendReasoningContent"; threadId: string; itemId: string; delta: string }
   | { type: "appendToolOutput"; threadId: string; itemId: string; delta: string }
   | { type: "setThreads"; workspaceId: string; threads: ThreadSummary[] }
@@ -220,6 +232,11 @@ export type ThreadAction =
       rateLimits: RateLimitSnapshot | null;
       modelId?: string | null;
     }
+  | {
+      type: "setAccountInfo";
+      workspaceId: string;
+      account: AccountSnapshot | null;
+    }
   | { type: "setActiveTurnId"; threadId: string; turnId: string | null }
   | { type: "setThreadPlan"; threadId: string; plan: TurnPlan | null }
   | { type: "clearThreadPlan"; threadId: string }
@@ -247,6 +264,7 @@ export const initialState: ThreadState = {
   tokenUsageByThread: {},
   rateLimitsByWorkspace: {},
   rateLimitsByWorkspaceModel: {},
+  accountByWorkspace: {},
   planByThread: {},
   lastAgentMessageByThread: {},
 };
@@ -274,6 +292,19 @@ function mergeStreamingText(existing: string, delta: string) {
     }
   }
   return `${existing}${delta}`;
+}
+
+function addSummaryBoundary(existing: string) {
+  if (!existing) {
+    return existing;
+  }
+  if (existing.endsWith("\n\n")) {
+    return existing;
+  }
+  if (existing.endsWith("\n")) {
+    return `${existing}\n`;
+  }
+  return `${existing}\n\n`;
 }
 
 function dropLatestLocalReviewStart(list: ConversationItem[]) {
@@ -767,6 +798,54 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
         },
       };
     }
+    case "appendReasoningSummaryBoundary": {
+      const list = state.itemsByThread[action.threadId] ?? [];
+      const index = list.findIndex((entry) => entry.id === action.itemId);
+      const base =
+        index >= 0 && list[index].kind === "reasoning"
+          ? (list[index] as ConversationItem)
+          : {
+              id: action.itemId,
+              kind: "reasoning",
+              summary: "",
+              content: "",
+            };
+      const updated: ConversationItem = {
+        ...base,
+        summary: addSummaryBoundary("summary" in base ? base.summary : ""),
+      } as ConversationItem;
+      const next = index >= 0 ? [...list] : [...list, updated];
+      if (index >= 0) {
+        next[index] = updated;
+      }
+      return {
+        ...state,
+        itemsByThread: {
+          ...state.itemsByThread,
+          [action.threadId]: prepareThreadItems(next),
+        },
+      };
+    }
+    case "appendContextCompacted": {
+      const list = state.itemsByThread[action.threadId] ?? [];
+      const id = `context-compacted-${action.turnId}`;
+      if (list.some((entry) => entry.id === id)) {
+        return state;
+      }
+      const compactedMessage: ConversationItem = {
+        id,
+        kind: "message",
+        role: "assistant",
+        text: "Context compacted.",
+      };
+      return {
+        ...state,
+        itemsByThread: {
+          ...state.itemsByThread,
+          [action.threadId]: prepareThreadItems([...list, compactedMessage]),
+        },
+      };
+    }
     case "appendReasoningContent": {
       const list = state.itemsByThread[action.threadId] ?? [];
       const index = list.findIndex((entry) => entry.id === action.itemId);
@@ -916,6 +995,14 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
             ...(state.rateLimitsByWorkspaceModel[action.workspaceId] ?? {}),
             [action.modelId ?? DEFAULT_RATE_LIMIT_KEY]: action.rateLimits,
           },
+        },
+      };
+    case "setAccountInfo":
+      return {
+        ...state,
+        accountByWorkspace: {
+          ...state.accountByWorkspace,
+          [action.workspaceId]: action.account,
         },
       };
     case "setThreadPlan":

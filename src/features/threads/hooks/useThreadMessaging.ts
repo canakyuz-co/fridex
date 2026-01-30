@@ -3,9 +3,11 @@ import type { Dispatch, MutableRefObject } from "react";
 import * as Sentry from "@sentry/react";
 import type {
   AccessMode,
+  RateLimitSnapshot,
   CustomPromptOption,
   DebugEntry,
   OtherAiProvider,
+  ReviewTarget,
   WorkspaceInfo,
 } from "../../../types";
 import {
@@ -25,6 +27,8 @@ import {
   parseReviewTarget,
 } from "../utils/threadNormalize";
 import type { ThreadAction, ThreadState } from "./useThreadsReducer";
+import { useReviewPrompt } from "./useReviewPrompt";
+import { formatRelativeTime } from "../../../utils/time";
 
 type SendMessageOptions = {
   skipPromptExpansion?: boolean;
@@ -46,6 +50,7 @@ type UseThreadMessagingOptions = {
   otherAiProviders: OtherAiProvider[];
   threadStatusById: ThreadState["threadStatusById"];
   activeTurnIdByThread: ThreadState["activeTurnIdByThread"];
+  rateLimitsByWorkspace: Record<string, RateLimitSnapshot | null>;
   pendingInterruptsRef: MutableRefObject<Set<string>>;
   dispatch: Dispatch<ThreadAction>;
   getCustomName: (workspaceId: string, threadId: string) => string | undefined;
@@ -63,6 +68,8 @@ type UseThreadMessagingOptions = {
   onClaudeUsage?: (usage: ClaudeUsage) => void;
   pushThreadErrorMessage: (threadId: string, message: string) => void;
   ensureThreadForActiveWorkspace: () => Promise<string | null>;
+  ensureThreadForWorkspace: (workspaceId: string) => Promise<string | null>;
+  refreshThread: (workspaceId: string, threadId: string) => Promise<string | null>;
 };
 
 export function useThreadMessaging({
@@ -77,6 +84,7 @@ export function useThreadMessaging({
   otherAiProviders,
   threadStatusById,
   activeTurnIdByThread,
+  rateLimitsByWorkspace,
   pendingInterruptsRef,
   dispatch,
   getCustomName,
@@ -90,6 +98,8 @@ export function useThreadMessaging({
   onClaudeUsage,
   pushThreadErrorMessage,
   ensureThreadForActiveWorkspace,
+  ensureThreadForWorkspace,
+  refreshThread,
 }: UseThreadMessagingOptions) {
   const sendMessageToThread = useCallback(
     async (
@@ -133,8 +143,8 @@ export function useThreadMessaging({
       const wasProcessing =
         (threadStatusById[threadId]?.isProcessing ?? false) && steerEnabled;
       if (wasProcessing) {
-        const optimisticText = finalText || (images.length > 0 ? "[image]" : "");
-        if (optimisticText) {
+        const optimisticText = finalText;
+        if (optimisticText || images.length > 0) {
           dispatch({
             type: "upsertItem",
             workspaceId: workspace.id,
@@ -146,6 +156,7 @@ export function useThreadMessaging({
               kind: "message",
               role: "user",
               text: optimisticText,
+              images: images.length > 0 ? images : undefined,
             },
             hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
           });
@@ -532,17 +543,19 @@ export function useThreadMessaging({
     setActiveTurnId,
   ]);
 
-  const startReview = useCallback(
-    async (text: string) => {
-      if (!activeWorkspace || !text.trim()) {
-        return;
+  const startReviewTarget = useCallback(
+    async (target: ReviewTarget, workspaceIdOverride?: string): Promise<boolean> => {
+      const workspaceId = workspaceIdOverride ?? activeWorkspace?.id ?? null;
+      if (!workspaceId) {
+        return false;
       }
-      const threadId = await ensureThreadForActiveWorkspace();
+      const threadId = workspaceIdOverride
+        ? await ensureThreadForWorkspace(workspaceId)
+        : await ensureThreadForActiveWorkspace();
       if (!threadId) {
-        return;
+        return false;
       }
 
-      const target = parseReviewTarget(text);
       markProcessing(threadId, true);
       markReviewing(threadId, true);
       safeMessageActivity();
@@ -552,14 +565,14 @@ export function useThreadMessaging({
         source: "client",
         label: "review/start",
         payload: {
-          workspaceId: activeWorkspace.id,
+          workspaceId,
           threadId,
           target,
         },
       });
       try {
         const response = await startReviewService(
-          activeWorkspace.id,
+          workspaceId,
           threadId,
           target,
           "inline",
@@ -578,8 +591,9 @@ export function useThreadMessaging({
           setActiveTurnId(threadId, null);
           pushThreadErrorMessage(threadId, `Review failed to start: ${rpcError}`);
           safeMessageActivity();
-          return;
+          return false;
         }
+        return true;
       } catch (error) {
         markProcessing(threadId, false);
         markReviewing(threadId, false);
@@ -595,11 +609,13 @@ export function useThreadMessaging({
           error instanceof Error ? error.message : String(error),
         );
         safeMessageActivity();
+        return false;
       }
     },
     [
       activeWorkspace,
       ensureThreadForActiveWorkspace,
+      ensureThreadForWorkspace,
       markProcessing,
       markReviewing,
       onDebug,
@@ -609,10 +625,201 @@ export function useThreadMessaging({
     ],
   );
 
+  const {
+    reviewPrompt,
+    openReviewPrompt,
+    closeReviewPrompt,
+    showPresetStep,
+    choosePreset,
+    highlightedPresetIndex,
+    setHighlightedPresetIndex,
+    highlightedBranchIndex,
+    setHighlightedBranchIndex,
+    highlightedCommitIndex,
+    setHighlightedCommitIndex,
+    handleReviewPromptKeyDown,
+    confirmBranch,
+    selectBranch,
+    selectBranchAtIndex,
+    selectCommit,
+    selectCommitAtIndex,
+    confirmCommit,
+    updateCustomInstructions,
+    confirmCustom,
+  } = useReviewPrompt({
+    activeWorkspace,
+    activeThreadId,
+    onDebug,
+    startReviewTarget,
+  });
+
+  const startReview = useCallback(
+    async (text: string) => {
+      if (!activeWorkspace || !text.trim()) {
+        return;
+      }
+      const trimmed = text.trim();
+      const rest = trimmed.replace(/^\/review\b/i, "").trim();
+      if (!rest) {
+        openReviewPrompt();
+        return;
+      }
+
+      const target = parseReviewTarget(trimmed);
+      await startReviewTarget(target);
+    },
+    [
+      activeWorkspace,
+      openReviewPrompt,
+      startReviewTarget,
+    ],
+  );
+
+  const startStatus = useCallback(
+    async (_text: string) => {
+      if (!activeWorkspace) {
+        return;
+      }
+      const threadId = await ensureThreadForActiveWorkspace();
+      if (!threadId) {
+        return;
+      }
+
+      const rateLimits = rateLimitsByWorkspace[activeWorkspace.id] ?? null;
+      const primaryUsed = rateLimits?.primary?.usedPercent;
+      const secondaryUsed = rateLimits?.secondary?.usedPercent;
+      const primaryReset = rateLimits?.primary?.resetsAt;
+      const secondaryReset = rateLimits?.secondary?.resetsAt;
+      const credits = rateLimits?.credits ?? null;
+
+      const normalizeReset = (value?: number | null) => {
+        if (typeof value !== "number" || !Number.isFinite(value)) {
+          return null;
+        }
+        return value > 1_000_000_000_000 ? value : value * 1000;
+      };
+
+      const resetLabel = (value?: number | null) => {
+        const resetAt = normalizeReset(value);
+        return resetAt ? formatRelativeTime(resetAt) : null;
+      };
+
+      const collabId =
+        collaborationMode &&
+        typeof collaborationMode === "object" &&
+        "settings" in collaborationMode &&
+        collaborationMode.settings &&
+        typeof collaborationMode.settings === "object" &&
+        "id" in collaborationMode.settings
+          ? String(collaborationMode.settings.id ?? "")
+          : "";
+
+      const lines = [
+        "Session status:",
+        `- Model: ${model ?? "default"}`,
+        `- Reasoning effort: ${effort ?? "default"}`,
+        `- Access: ${accessMode ?? "current"}`,
+        `- Collaboration: ${collabId || "off"}`,
+      ];
+
+      if (typeof primaryUsed === "number") {
+        const reset = resetLabel(primaryReset);
+        lines.push(
+          `- Session usage: ${Math.round(primaryUsed)}%${
+            reset ? ` (resets ${reset})` : ""
+          }`,
+        );
+      }
+      if (typeof secondaryUsed === "number") {
+        const reset = resetLabel(secondaryReset);
+        lines.push(
+          `- Weekly usage: ${Math.round(secondaryUsed)}%${
+            reset ? ` (resets ${reset})` : ""
+          }`,
+        );
+      }
+      if (credits?.hasCredits) {
+        if (credits.unlimited) {
+          lines.push("- Credits: unlimited");
+        } else if (credits.balance) {
+          lines.push(`- Credits: ${credits.balance}`);
+        }
+      }
+
+      const timestamp = Date.now();
+      recordThreadActivity(activeWorkspace.id, threadId, timestamp);
+      dispatch({
+        type: "addAssistantMessage",
+        threadId,
+        text: lines.join("\n"),
+      });
+      safeMessageActivity();
+    },
+    [
+      accessMode,
+      activeWorkspace,
+      collaborationMode,
+      dispatch,
+      effort,
+      ensureThreadForActiveWorkspace,
+      model,
+      rateLimitsByWorkspace,
+      recordThreadActivity,
+      safeMessageActivity,
+    ],
+  );
+
+  const startResume = useCallback(
+    async (_text: string) => {
+      if (!activeWorkspace) {
+        return;
+      }
+      if (activeThreadId && threadStatusById[activeThreadId]?.isProcessing) {
+        return;
+      }
+      const threadId = activeThreadId ?? (await ensureThreadForActiveWorkspace());
+      if (!threadId) {
+        return;
+      }
+      await refreshThread(activeWorkspace.id, threadId);
+      safeMessageActivity();
+    },
+    [
+      activeThreadId,
+      activeWorkspace,
+      ensureThreadForActiveWorkspace,
+      refreshThread,
+      safeMessageActivity,
+      threadStatusById,
+    ],
+  );
+
   return {
     interruptTurn,
     sendUserMessage,
     sendUserMessageToThread,
     startReview,
+    startResume,
+    startStatus,
+    reviewPrompt,
+    openReviewPrompt,
+    closeReviewPrompt,
+    showPresetStep,
+    choosePreset,
+    highlightedPresetIndex,
+    setHighlightedPresetIndex,
+    highlightedBranchIndex,
+    setHighlightedBranchIndex,
+    highlightedCommitIndex,
+    setHighlightedCommitIndex,
+    handleReviewPromptKeyDown,
+    confirmBranch,
+    selectBranch,
+    selectBranchAtIndex,
+    selectCommit,
+    selectCommitAtIndex,
+    confirmCommit,
+    updateCustomInstructions,
+    confirmCustom,
   };
 }

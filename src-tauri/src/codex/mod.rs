@@ -9,19 +9,21 @@ use tokio::process::Command;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
 
+pub(crate) mod args;
+pub(crate) mod config;
+pub(crate) mod home;
+
 pub(crate) use crate::backend::app_server::WorkspaceSession;
 use crate::backend::app_server::{
     build_codex_command_with_bin, build_codex_path_env, check_codex_installation,
     spawn_workspace_session as spawn_workspace_session_inner,
 };
-use crate::codex_args::apply_codex_args;
-use crate::codex_config;
-use crate::codex_home::{resolve_default_codex_home, resolve_workspace_codex_home};
 use crate::event_sink::TauriEventSink;
 use crate::remote_backend;
-use crate::rules;
+use crate::shared::codex_core;
 use crate::state::AppState;
 use crate::types::WorkspaceEntry;
+use self::args::apply_codex_args;
 
 pub(crate) async fn spawn_workspace_session(
     entry: WorkspaceEntry,
@@ -157,15 +159,7 @@ pub(crate) async fn start_thread(
         .await;
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
-    let params = json!({
-        "cwd": session.entry.path,
-        "approvalPolicy": "onRequest"
-    });
-    session.send_request("thread/start", params).await
+    codex_core::start_thread_core(&state.sessions, workspace_id).await
 }
 
 #[tauri::command]
@@ -185,14 +179,7 @@ pub(crate) async fn resume_thread(
         .await;
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
-    let params = json!({
-        "threadId": thread_id
-    });
-    session.send_request("thread/resume", params).await
+    codex_core::resume_thread_core(&state.sessions, workspace_id, thread_id).await
 }
 
 #[tauri::command]
@@ -213,15 +200,7 @@ pub(crate) async fn list_threads(
         .await;
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
-    let params = json!({
-        "cursor": cursor,
-        "limit": limit,
-    });
-    session.send_request("thread/list", params).await
+    codex_core::list_threads_core(&state.sessions, workspace_id, cursor, limit).await
 }
 
 #[tauri::command]
@@ -241,14 +220,7 @@ pub(crate) async fn archive_thread(
         .await;
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
-    let params = json!({
-        "threadId": thread_id
-    });
-    session.send_request("thread/archive", params).await
+    codex_core::archive_thread_core(&state.sessions, workspace_id, thread_id).await
 }
 
 #[tauri::command]
@@ -293,72 +265,18 @@ pub(crate) async fn send_user_message(
         .await;
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
-    let access_mode = access_mode.unwrap_or_else(|| "current".to_string());
-    let sandbox_policy = match access_mode.as_str() {
-        "full-access" => json!({
-            "type": "dangerFullAccess"
-        }),
-        "read-only" => json!({
-            "type": "readOnly"
-        }),
-        _ => json!({
-            "type": "workspaceWrite",
-            "writableRoots": [session.entry.path],
-            "networkAccess": true
-        }),
-    };
-
-    let approval_policy = if access_mode == "full-access" {
-        "never"
-    } else {
-        "onRequest"
-    };
-
-    let trimmed_text = text.trim();
-    let mut input: Vec<Value> = Vec::new();
-    if !trimmed_text.is_empty() {
-        input.push(json!({ "type": "text", "text": trimmed_text }));
-    }
-    if let Some(paths) = images {
-        for path in paths {
-            let trimmed = path.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
-            if trimmed.starts_with("data:")
-                || trimmed.starts_with("http://")
-                || trimmed.starts_with("https://")
-            {
-                input.push(json!({ "type": "image", "url": trimmed }));
-            } else {
-                input.push(json!({ "type": "localImage", "path": trimmed }));
-            }
-        }
-    }
-    if input.is_empty() {
-        return Err("empty user message".to_string());
-    }
-
-    let mut params = Map::new();
-    params.insert("threadId".to_string(), json!(thread_id));
-    params.insert("input".to_string(), json!(input));
-    params.insert("cwd".to_string(), json!(session.entry.path));
-    params.insert("approvalPolicy".to_string(), json!(approval_policy));
-    params.insert("sandboxPolicy".to_string(), json!(sandbox_policy));
-    params.insert("model".to_string(), json!(model));
-    params.insert("effort".to_string(), json!(effort));
-    if let Some(mode) = collaboration_mode {
-        if !mode.is_null() {
-            params.insert("collaborationMode".to_string(), mode);
-        }
-    }
-    session
-        .send_request("turn/start", Value::Object(params))
-        .await
+    codex_core::send_user_message_core(
+        &state.sessions,
+        workspace_id,
+        thread_id,
+        text,
+        model,
+        effort,
+        access_mode,
+        images,
+        collaboration_mode,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -377,13 +295,7 @@ pub(crate) async fn collaboration_mode_list(
         .await;
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
-    session
-        .send_request("collaborationMode/list", json!({}))
-        .await
+    codex_core::collaboration_mode_list_core(&state.sessions, workspace_id).await
 }
 
 #[tauri::command]
@@ -404,15 +316,7 @@ pub(crate) async fn turn_interrupt(
         .await;
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
-    let params = json!({
-        "threadId": thread_id,
-        "turnId": turn_id,
-    });
-    session.send_request("turn/interrupt", params).await
+    codex_core::turn_interrupt_core(&state.sessions, workspace_id, thread_id, turn_id).await
 }
 
 #[tauri::command]
@@ -439,19 +343,7 @@ pub(crate) async fn start_review(
         .await;
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
-    let mut params = Map::new();
-    params.insert("threadId".to_string(), json!(thread_id));
-    params.insert("target".to_string(), target);
-    if let Some(delivery) = delivery {
-        params.insert("delivery".to_string(), json!(delivery));
-    }
-    session
-        .send_request("review/start", Value::Object(params))
-        .await
+    codex_core::start_review_core(&state.sessions, workspace_id, thread_id, target, delivery).await
 }
 
 #[tauri::command]
@@ -470,12 +362,7 @@ pub(crate) async fn model_list(
         .await;
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
-    let params = json!({});
-    session.send_request("model/list", params).await
+    codex_core::model_list_core(&state.sessions, workspace_id).await
 }
 
 #[tauri::command]
@@ -494,13 +381,70 @@ pub(crate) async fn account_rate_limits(
         .await;
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
-    session
-        .send_request("account/rateLimits/read", Value::Null)
-        .await
+    codex_core::account_rate_limits_core(&state.sessions, workspace_id).await
+}
+
+#[tauri::command]
+pub(crate) async fn account_read(
+    workspace_id: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "account_read",
+            json!({ "workspaceId": workspace_id }),
+        )
+        .await;
+    }
+
+    codex_core::account_read_core(&state.sessions, &state.workspaces, workspace_id).await
+}
+
+#[tauri::command]
+pub(crate) async fn codex_login(
+    workspace_id: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "codex_login",
+            json!({ "workspaceId": workspace_id }),
+        )
+        .await;
+    }
+
+    codex_core::codex_login_core(
+        &state.workspaces,
+        &state.app_settings,
+        &state.codex_login_cancels,
+        workspace_id,
+    )
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn codex_login_cancel(
+    workspace_id: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "codex_login_cancel",
+            json!({ "workspaceId": workspace_id }),
+        )
+        .await;
+    }
+
+    codex_core::codex_login_cancel_core(&state.codex_login_cancels, workspace_id).await
 }
 
 #[tauri::command]
@@ -519,14 +463,7 @@ pub(crate) async fn skills_list(
         .await;
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
-    let params = json!({
-        "cwd": session.entry.path
-    });
-    session.send_request("skills/list", params).await
+    codex_core::skills_list_core(&state.sessions, workspace_id).await
 }
 
 #[tauri::command]
@@ -548,11 +485,8 @@ pub(crate) async fn respond_to_server_request(
         return Ok(());
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
-    session.send_response(request_id, result).await
+    codex_core::respond_to_server_request_core(&state.sessions, workspace_id, request_id, result)
+        .await
 }
 
 /// Gets the diff content for commit message generation
@@ -585,23 +519,7 @@ pub(crate) async fn remember_approval_rule(
     command: Vec<String>,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
-    let command = command
-        .into_iter()
-        .map(|item| item.trim().to_string())
-        .filter(|item| !item.is_empty())
-        .collect::<Vec<_>>();
-    if command.is_empty() {
-        return Err("empty command".to_string());
-    }
-
-    let codex_home = resolve_codex_home_for_workspace(&workspace_id, &state).await?;
-    let rules_path = rules::default_rules_path(&codex_home);
-    rules::append_prefix_rule(&rules_path, &command)?;
-
-    Ok(json!({
-        "ok": true,
-        "rulesPath": rules_path,
-    }))
+    codex_core::remember_approval_rule_core(&state.workspaces, workspace_id, command).await
 }
 
 #[tauri::command]
@@ -620,32 +538,7 @@ pub(crate) async fn get_config_model(
         .await;
     }
 
-    let codex_home = resolve_codex_home_for_workspace(&workspace_id, &state).await?;
-    let model = codex_config::read_config_model(Some(codex_home))?;
-    Ok(json!({ "model": model }))
-}
-
-async fn resolve_codex_home_for_workspace(
-    workspace_id: &str,
-    state: &State<'_, AppState>,
-) -> Result<PathBuf, String> {
-    let (entry, parent_entry) = {
-        let workspaces = state.workspaces.lock().await;
-        let entry = workspaces
-            .get(workspace_id)
-            .ok_or("workspace not found")?
-            .clone();
-        let parent_entry = entry
-            .parent_id
-            .as_ref()
-            .and_then(|parent_id| workspaces.get(parent_id))
-            .cloned();
-        (entry, parent_entry)
-    };
-
-    resolve_workspace_codex_home(&entry, parent_entry.as_ref())
-        .or_else(resolve_default_codex_home)
-        .ok_or("Unable to resolve CODEX_HOME".to_string())
+    codex_core::get_config_model_core(&state.workspaces, workspace_id).await
 }
 
 /// Generates a commit message in the background without showing in the main chat

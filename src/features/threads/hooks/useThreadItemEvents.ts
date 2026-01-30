@@ -156,7 +156,6 @@ export function useThreadItemEvents({
         text,
         timestamp,
       });
-      markProcessing(threadId, false);
       recordThreadActivity(workspaceId, threadId, timestamp);
       safeMessageActivity();
       if (threadId !== activeThreadId) {
@@ -167,7 +166,6 @@ export function useThreadItemEvents({
       activeThreadId,
       dispatch,
       getCustomName,
-      markProcessing,
       recordThreadActivity,
       safeMessageActivity,
     ],
@@ -190,6 +188,13 @@ export function useThreadItemEvents({
   const onReasoningSummaryDelta = useCallback(
     (_workspaceId: string, threadId: string, itemId: string, delta: string) => {
       dispatch({ type: "appendReasoningSummary", threadId, itemId, delta });
+    },
+    [dispatch],
+  );
+
+  const onReasoningSummaryBoundary = useCallback(
+    (_workspaceId: string, threadId: string, itemId: string) => {
+      dispatch({ type: "appendReasoningSummaryBoundary", threadId, itemId });
     },
     [dispatch],
   );
@@ -228,6 +233,7 @@ export function useThreadItemEvents({
     onItemStarted,
     onItemCompleted,
     onReasoningSummaryDelta,
+    onReasoningSummaryBoundary,
     onReasoningTextDelta,
     onCommandOutputDelta,
     onTerminalInteraction,

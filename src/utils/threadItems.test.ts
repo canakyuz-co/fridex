@@ -122,6 +122,28 @@ describe("threadItems", () => {
     expect(prepared.filter((item) => item.kind === "tool")).toHaveLength(0);
   });
 
+  it("treats inProgress command status as exploring", () => {
+    const items: ConversationItem[] = [
+      {
+        id: "cmd-1",
+        kind: "tool",
+        toolType: "commandExecution",
+        title: "Command: rg RouterDestination src",
+        detail: "",
+        status: "inProgress",
+        output: "",
+      },
+    ];
+
+    const prepared = prepareThreadItems(items);
+    expect(prepared).toHaveLength(1);
+    expect(prepared[0].kind).toBe("explore");
+    if (prepared[0].kind === "explore") {
+      expect(prepared[0].status).toBe("exploring");
+      expect(prepared[0].entries[0]?.kind).toBe("search");
+    }
+  });
+
   it("deduplicates explore entries when consecutive summaries merge", () => {
     const items: ConversationItem[] = [
       {
@@ -442,13 +464,28 @@ describe("threadItems", () => {
       content: [
         { type: "text", text: "Please" },
         { type: "skill", name: "Review" },
-        { type: "image" },
+        { type: "image", url: "https://example.com/image.png" },
       ],
     });
     expect(item).not.toBeNull();
     if (item && item.kind === "message") {
       expect(item.role).toBe("user");
-      expect(item.text).toBe("Please $Review [image]");
+      expect(item.text).toBe("Please $Review");
+      expect(item.images).toEqual(["https://example.com/image.png"]);
+    }
+  });
+
+  it("keeps image-only user messages without placeholder text", () => {
+    const item = buildConversationItemFromThreadItem({
+      type: "userMessage",
+      id: "msg-2",
+      content: [{ type: "image", url: "https://example.com/only.png" }],
+    });
+    expect(item).not.toBeNull();
+    if (item && item.kind === "message") {
+      expect(item.role).toBe("user");
+      expect(item.text).toBe("");
+      expect(item.images).toEqual(["https://example.com/only.png"]);
     }
   });
 

@@ -4,18 +4,7 @@ use tauri::{RunEvent, WindowEvent};
 
 mod backend;
 mod codex;
-mod codex_args;
-mod codex_config;
-mod codex_home;
-mod file_io;
-mod file_ops;
-mod file_policy;
 mod files;
-#[cfg(not(target_os = "windows"))]
-#[path = "dictation.rs"]
-mod dictation;
-#[cfg(target_os = "windows")]
-#[path = "dictation_stub.rs"]
 mod dictation;
 mod event_sink;
 mod git;
@@ -30,6 +19,7 @@ mod settings;
 mod state;
 mod storage;
 mod tasks;
+mod shared;
 mod terminal;
 mod types;
 mod utils;
@@ -177,6 +167,9 @@ other_ai::list_other_ai_models,
             git::create_git_branch,
             codex::model_list,
             codex::account_rate_limits,
+            codex::account_read,
+            codex::codex_login,
+            codex::codex_login_cancel,
             codex::skills_list,
             prompts::prompts_list,
             prompts::prompts_create,

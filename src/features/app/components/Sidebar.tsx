@@ -1,4 +1,10 @@
-import type { ClaudeUsageSnapshot, RateLimitSnapshot, ThreadSummary, WorkspaceInfo } from "../../../types";
+import type {
+  AccountSnapshot,
+  ClaudeUsageSnapshot,
+  RateLimitSnapshot,
+  ThreadSummary,
+  WorkspaceInfo,
+} from "../../../types";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
@@ -49,6 +55,11 @@ type SidebarProps = {
   accountRateLimits: RateLimitSnapshot | null;
   claudeUsage?: ClaudeUsageSnapshot | null;
   isOtherAiModel?: boolean;
+  usageShowRemaining: boolean;
+  accountInfo: AccountSnapshot | null;
+  onSwitchAccount: () => void;
+  onCancelSwitchAccount: () => void;
+  accountSwitching: boolean;
   onOpenSettings: () => void;
   onOpenDebug: () => void;
   showDebugButton: boolean;
@@ -97,6 +108,11 @@ export function Sidebar({
   accountRateLimits,
   claudeUsage,
   isOtherAiModel,
+  usageShowRemaining,
+  accountInfo,
+  onSwitchAccount,
+  onCancelSwitchAccount,
+  accountSwitching,
   onOpenSettings,
   onOpenDebug,
   showDebugButton,
@@ -164,7 +180,7 @@ export function Sidebar({
     weeklyResetLabel,
     creditsLabel,
     showWeekly,
-  } = getUsageLabels(accountRateLimits);
+  } = getUsageLabels(accountRateLimits, usageShowRemaining);
   const normalizedQuery = debouncedQuery.trim().toLowerCase();
 
   const isWorkspaceMatch = useCallback(
@@ -208,6 +224,17 @@ export function Sidebar({
     },
     [normalizedQuery],
   );
+
+  const accountEmail = accountInfo?.email?.trim() ?? "";
+  const accountButtonLabel = accountEmail
+    ? accountEmail
+    : accountInfo?.type === "apikey"
+      ? "API key"
+      : "Sign in to Codex";
+  const accountActionLabel = accountEmail ? "Switch account" : "Sign in";
+  const showAccountSwitcher = Boolean(activeWorkspaceId);
+  const accountSwitchDisabled = accountSwitching || !activeWorkspaceId;
+  const accountCancelDisabled = !accountSwitching || !activeWorkspaceId;
 
   const pinnedThreadRows = (() => {
     type ThreadRow = { thread: ThreadSummary; depth: number };
@@ -618,6 +645,14 @@ export function Sidebar({
         onOpenSettings={onOpenSettings}
         onOpenDebug={onOpenDebug}
         showDebugButton={showDebugButton}
+        showAccountSwitcher={showAccountSwitcher}
+        accountLabel={accountButtonLabel}
+        accountActionLabel={accountActionLabel}
+        accountDisabled={accountSwitchDisabled}
+        accountSwitching={accountSwitching}
+        accountCancelDisabled={accountCancelDisabled}
+        onSwitchAccount={onSwitchAccount}
+        onCancelSwitchAccount={onCancelSwitchAccount}
       />
     </aside>
   );
