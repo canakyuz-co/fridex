@@ -44,6 +44,11 @@ This folder groups the main product documents so each pillar can evolve independ
    - RBAC/ABAC gates for sensitive actions. (Hassas işlemler için RBAC/ABAC kapıları.)
    - Audit trail, data retention, and privacy policy. (Denetim izi, veri saklama ve gizlilik politikası.)
 
+9) [CI/CD & Server Provisioning](CI_CD_and_Server_Provisioning.md)  
+   - Pipelines, self-hosted runners, and deploy templates. (Pipeline, self-hosted runner ve deploy şablonları.)
+   - Server config, services, and DB management. (Sunucu konfig, servis ve DB yönetimi.)
+   - Release playbook and rollback. (Release playbook ve rollback.)
+
 ## Current Stack Snapshot
 
 - Frontend: React + Vite (TypeScript), feature-sliced UI. (Frontend: React + Vite (TypeScript), feature-sliced UI.)
