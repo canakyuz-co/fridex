@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { readWorkspaceFile, writeWorkspaceFile } from "../../../services/tauri";
-import { languageFromPath } from "../../../utils/syntax";
+import { monacoLanguageFromPath } from "../../../utils/languageRegistry";
 
 type EditorBuffer = {
   path: string;
@@ -29,52 +29,6 @@ type UseEditorStateResult = {
   saveFile: (path: string) => void;
 };
 
-function toMonacoLanguage(path: string): string | null {
-  const language = languageFromPath(path);
-  if (!language) {
-    return "plaintext";
-  }
-  if (language === "markup") {
-    return "html";
-  }
-  if (language === "bash") {
-    return "shell";
-  }
-  if (language === "tsx" || language === "typescript") {
-    return "typescript";
-  }
-  if (language === "jsx" || language === "javascript") {
-    return "javascript";
-  }
-  if (language === "markdown") {
-    return "markdown";
-  }
-  if (language === "json") {
-    return "json";
-  }
-  if (language === "yaml") {
-    return "yaml";
-  }
-  if (language === "sql") {
-    return "sql";
-  }
-  if (language === "graphql") {
-    return "graphql";
-  }
-  if (language === "prisma") {
-    return "prisma";
-  }
-  if (language === "terraform") {
-    return "terraform";
-  }
-  if (language === "dockerfile") {
-    return "dockerfile";
-  }
-  if (language === "text") {
-    return "plaintext";
-  }
-  return "plaintext";
-}
 
 export function useEditorState({
   workspaceId,
@@ -106,7 +60,7 @@ export function useEditorState({
           [path]: {
             path,
             content: "",
-            language: toMonacoLanguage(path),
+            language: monacoLanguageFromPath(path),
             isDirty: false,
             isSaving: false,
             isLoading: true,

@@ -20,47 +20,7 @@ import "prismjs/components/prism-toml";
 import "prismjs/components/prism-typescript";
 import "prismjs/components/prism-tsx";
 import "prismjs/components/prism-yaml";
-
-const EXTENSION_TO_LANGUAGE: Record<string, string> = {
-  bash: "bash",
-  c: "c",
-  cpp: "cpp",
-  css: "css",
-  gql: "graphql",
-  go: "go",
-  h: "c",
-  hpp: "cpp",
-  html: "markup",
-  java: "java",
-  js: "javascript",
-  json: "json",
-  jsx: "jsx",
-  kt: "kotlin",
-  md: "markdown",
-  mjs: "javascript",
-  php: "php",
-  prisma: "prisma",
-  rs: "rust",
-  sass: "scss",
-  scss: "scss",
-  sql: "sql",
-  sh: "bash",
-  swift: "swift",
-  tf: "terraform",
-  tfvars: "terraform",
-  toml: "toml",
-  ts: "typescript",
-  tsx: "tsx",
-  txt: "text",
-  xml: "xml",
-  yaml: "yaml",
-  yml: "yaml",
-  lua: "lua",
-  rb: "ruby",
-  rake: "ruby",
-  graphql: "graphql",
-  hcl: "terraform",
-};
+import { languageFromPath } from "./languageRegistry";
 
 function escapeHtml(value: string) {
   return value
@@ -69,22 +29,7 @@ function escapeHtml(value: string) {
     .replace(/>/g, "&gt;");
 }
 
-export function languageFromPath(path?: string | null) {
-  if (!path) {
-    return null;
-  }
-  const fileName = path.split("/").pop() ?? path;
-  const lowerFile = fileName.toLowerCase();
-  if (lowerFile === "dockerfile" || lowerFile.startsWith("dockerfile.")) {
-    return "dockerfile";
-  }
-  const dotIndex = fileName.lastIndexOf(".");
-  if (dotIndex <= 0 || dotIndex === fileName.length - 1) {
-    return null;
-  }
-  const ext = fileName.slice(dotIndex + 1).toLowerCase();
-  return EXTENSION_TO_LANGUAGE[ext] ?? null;
-}
+export { languageFromPath };
 
 export function highlightLine(text: string, language?: string | null) {
   if (!language || !(Prism.languages as Record<string, unknown>)[language]) {
