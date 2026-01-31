@@ -1,5 +1,7 @@
 # Friday Agent Guide
 
+All docs must canonical, no past commentary, only live state.
+
 ## Project Summary
 Friday is a macOS Tauri app that orchestrates Codex agents across local workspaces. The frontend is React + Vite; the backend is a Tauri Rust process that spawns `codex app-server` per workspace and streams JSON-RPC events.
 

@@ -410,6 +410,7 @@ function MainApp() {
     activeWorkspaceRef,
   } = useGitPanelController({
     activeWorkspace,
+    gitDiffPreloadEnabled: appSettings.preloadGitDiffs,
     isCompact,
     isTablet,
     activeTab,
@@ -730,8 +731,10 @@ function MainApp() {
     refreshThread,
     sendUserMessage,
     sendUserMessageToThread,
+    startFork,
     startReview,
     startResume,
+    startMcp,
     startStatus,
     reviewPrompt,
     closeReviewPrompt,
@@ -1137,8 +1140,10 @@ function MainApp() {
     startThreadForWorkspace,
     sendUserMessage,
     sendUserMessageToThread,
+    startFork,
     startReview,
     startResume,
+    startMcp,
     startStatus,
   });
 
@@ -1165,6 +1170,8 @@ function MainApp() {
     activeWorkspace,
     models,
     selectedModelId,
+    effort: resolvedEffort,
+    collaborationMode: collaborationModePayload,
     addWorktreeAgent,
     connectWorkspace,
     startThreadForWorkspace,
@@ -2125,6 +2132,13 @@ const {
       modelSelections={workspaceModelSelections}
       onToggleModel={toggleWorkspaceModelSelection}
       onModelCountChange={setWorkspaceModelCount}
+      collaborationModes={collaborationModes}
+      selectedCollaborationModeId={selectedCollaborationModeId}
+      onSelectCollaborationMode={setSelectedCollaborationModeId}
+      reasoningOptions={reasoningOptions}
+      selectedEffort={selectedEffort}
+      onSelectEffort={setSelectedEffort}
+      reasoningSupported={reasoningSupported}
       error={workspaceRunError}
       isSubmitting={workspaceRunSubmitting}
       activeWorkspaceId={activeWorkspaceId}

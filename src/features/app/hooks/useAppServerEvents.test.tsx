@@ -47,6 +47,8 @@ describe("useAppServerEvents", () => {
     const handlers: Handlers = {
       onAppServerEvent: vi.fn(),
       onWorkspaceConnected: vi.fn(),
+      onThreadStarted: vi.fn(),
+      onBackgroundThreadAction: vi.fn(),
       onAgentMessageDelta: vi.fn(),
       onReasoningSummaryBoundary: vi.fn(),
       onContextCompacted: vi.fn(),
@@ -108,6 +110,35 @@ describe("useAppServerEvents", () => {
       "ws-1",
       "thread-1",
       "turn-7",
+    );
+
+    act(() => {
+      listener?.({
+        workspace_id: "ws-1",
+        message: {
+          method: "thread/started",
+          params: { thread: { id: "thread-2", preview: "New thread" } },
+        },
+      });
+    });
+    expect(handlers.onThreadStarted).toHaveBeenCalledWith("ws-1", {
+      id: "thread-2",
+      preview: "New thread",
+    });
+
+    act(() => {
+      listener?.({
+        workspace_id: "ws-1",
+        message: {
+          method: "codex/backgroundThread",
+          params: { threadId: "thread-2", action: "hide" },
+        },
+      });
+    });
+    expect(handlers.onBackgroundThreadAction).toHaveBeenCalledWith(
+      "ws-1",
+      "thread-2",
+      "hide",
     );
 
     act(() => {

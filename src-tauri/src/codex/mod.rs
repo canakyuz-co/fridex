@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use tokio::process::Command;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
@@ -14,6 +14,7 @@ pub(crate) mod config;
 pub(crate) mod home;
 
 pub(crate) use crate::backend::app_server::WorkspaceSession;
+use crate::backend::events::AppServerEvent;
 use crate::backend::app_server::{
     build_codex_command_with_bin, build_codex_path_env, check_codex_installation,
     spawn_workspace_session as spawn_workspace_session_inner,
@@ -183,6 +184,26 @@ pub(crate) async fn resume_thread(
 }
 
 #[tauri::command]
+pub(crate) async fn fork_thread(
+    workspace_id: String,
+    thread_id: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "fork_thread",
+            json!({ "workspaceId": workspace_id, "threadId": thread_id }),
+        )
+        .await;
+    }
+
+    codex_core::fork_thread_core(&state.sessions, workspace_id, thread_id).await
+}
+
+#[tauri::command]
 pub(crate) async fn list_threads(
     workspace_id: String,
     cursor: Option<String>,
@@ -201,6 +222,27 @@ pub(crate) async fn list_threads(
     }
 
     codex_core::list_threads_core(&state.sessions, workspace_id, cursor, limit).await
+}
+
+#[tauri::command]
+pub(crate) async fn list_mcp_server_status(
+    workspace_id: String,
+    cursor: Option<String>,
+    limit: Option<u32>,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "list_mcp_server_status",
+            json!({ "workspaceId": workspace_id, "cursor": cursor, "limit": limit }),
+        )
+        .await;
+    }
+
+    codex_core::list_mcp_server_status_core(&state.sessions, workspace_id, cursor, limit).await
 }
 
 #[tauri::command]
@@ -362,7 +404,7 @@ pub(crate) async fn model_list(
         .await;
     }
 
-    codex_core::model_list_core(&state.sessions, workspace_id).await
+    codex_core::model_list_core(&state.sessions, &state.workspaces, workspace_id).await
 }
 
 #[tauri::command]
@@ -546,6 +588,7 @@ pub(crate) async fn get_config_model(
 pub(crate) async fn generate_commit_message(
     workspace_id: String,
     state: State<'_, AppState>,
+    app: AppHandle,
 ) -> Result<String, String> {
     // Get the diff from git
     let diff = crate::git::get_workspace_diff(&workspace_id, &state).await?;
@@ -597,6 +640,21 @@ Changes:\n{diff}"
         .and_then(|t| t.as_str())
         .ok_or_else(|| format!("Failed to get threadId from thread/start response: {:?}", thread_result))?
         .to_string();
+
+    // Hide background helper threads from the sidebar, even if a thread/started event leaked.
+    let _ = app.emit(
+        "app-server-event",
+        AppServerEvent {
+            workspace_id: workspace_id.clone(),
+            message: json!({
+                "method": "codex/backgroundThread",
+                "params": {
+                    "threadId": thread_id,
+                    "action": "hide"
+                }
+            }),
+        },
+    );
 
     // Create channel for receiving events
     let (tx, mut rx) = mpsc::unbounded_channel::<Value>();
@@ -780,6 +838,21 @@ Task:\n{cleaned_prompt}"
         .and_then(|t| t.as_str())
         .ok_or_else(|| format!("Failed to get threadId from thread/start response: {:?}", thread_result))?
         .to_string();
+
+    // Hide background helper threads from the sidebar, even if a thread/started event leaked.
+    let _ = app.emit(
+        "app-server-event",
+        AppServerEvent {
+            workspace_id: workspace_id.clone(),
+            message: json!({
+                "method": "codex/backgroundThread",
+                "params": {
+                    "threadId": thread_id,
+                    "action": "hide"
+                }
+            }),
+        },
+    );
 
     let (tx, mut rx) = mpsc::unbounded_channel::<Value>();
     {

@@ -556,6 +556,10 @@ impl DaemonState {
         codex_core::resume_thread_core(&self.sessions, workspace_id, thread_id).await
     }
 
+    async fn fork_thread(&self, workspace_id: String, thread_id: String) -> Result<Value, String> {
+        codex_core::fork_thread_core(&self.sessions, workspace_id, thread_id).await
+    }
+
     async fn list_threads(
         &self,
         workspace_id: String,
@@ -563,6 +567,15 @@ impl DaemonState {
         limit: Option<u32>,
     ) -> Result<Value, String> {
         codex_core::list_threads_core(&self.sessions, workspace_id, cursor, limit).await
+    }
+
+    async fn list_mcp_server_status(
+        &self,
+        workspace_id: String,
+        cursor: Option<String>,
+        limit: Option<u32>,
+    ) -> Result<Value, String> {
+        codex_core::list_mcp_server_status_core(&self.sessions, workspace_id, cursor, limit).await
     }
 
     async fn archive_thread(&self, workspace_id: String, thread_id: String) -> Result<Value, String> {
@@ -615,7 +628,7 @@ impl DaemonState {
     }
 
     async fn model_list(&self, workspace_id: String) -> Result<Value, String> {
-        codex_core::model_list_core(&self.sessions, workspace_id).await
+        codex_core::model_list_core(&self.sessions, &self.workspaces, workspace_id).await
     }
 
     async fn collaboration_mode_list(&self, workspace_id: String) -> Result<Value, String> {
@@ -1418,11 +1431,22 @@ async fn handle_rpc_request(
             let thread_id = parse_string(&params, "threadId")?;
             state.resume_thread(workspace_id, thread_id).await
         }
+        "fork_thread" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let thread_id = parse_string(&params, "threadId")?;
+            state.fork_thread(workspace_id, thread_id).await
+        }
         "list_threads" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
             let cursor = parse_optional_string(&params, "cursor");
             let limit = parse_optional_u32(&params, "limit");
             state.list_threads(workspace_id, cursor, limit).await
+        }
+        "list_mcp_server_status" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let cursor = parse_optional_string(&params, "cursor");
+            let limit = parse_optional_u32(&params, "limit");
+            state.list_mcp_server_status(workspace_id, cursor, limit).await
         }
         "archive_thread" => {
             let workspace_id = parse_string(&params, "workspaceId")?;

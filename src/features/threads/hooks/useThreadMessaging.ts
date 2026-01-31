@@ -19,6 +19,7 @@ import {
   type ClaudeMessage,
   type ClaudeRateLimits,
   type ClaudeUsage,
+  listMcpServerStatus as listMcpServerStatusService,
 } from "../../../services/tauri";
 import { expandCustomPromptText } from "../../../utils/customPrompts";
 import {
@@ -70,6 +71,8 @@ type UseThreadMessagingOptions = {
   ensureThreadForActiveWorkspace: () => Promise<string | null>;
   ensureThreadForWorkspace: (workspaceId: string) => Promise<string | null>;
   refreshThread: (workspaceId: string, threadId: string) => Promise<string | null>;
+  forkThreadForWorkspace: (workspaceId: string, threadId: string) => Promise<string | null>;
+  updateThreadParent: (parentId: string, childIds: string[]) => void;
 };
 
 export function useThreadMessaging({
@@ -100,6 +103,8 @@ export function useThreadMessaging({
   ensureThreadForActiveWorkspace,
   ensureThreadForWorkspace,
   refreshThread,
+  forkThreadForWorkspace,
+  updateThreadParent,
 }: UseThreadMessagingOptions) {
   const sendMessageToThread = useCallback(
     async (
@@ -769,6 +774,134 @@ export function useThreadMessaging({
     ],
   );
 
+  const startMcp = useCallback(
+    async (_text: string) => {
+      if (!activeWorkspace) {
+        return;
+      }
+      const threadId = await ensureThreadForActiveWorkspace();
+      if (!threadId) {
+        return;
+      }
+
+      try {
+        const response = (await listMcpServerStatusService(
+          activeWorkspace.id,
+          null,
+          null,
+        )) as Record<string, unknown> | null;
+        const result = (response?.result ?? response) as
+          | Record<string, unknown>
+          | null;
+        const data = Array.isArray(result?.data)
+          ? (result?.data as Array<Record<string, unknown>>)
+          : [];
+
+        const lines: string[] = ["MCP tools:"];
+        if (data.length === 0) {
+          lines.push("- No MCP servers configured.");
+        } else {
+          const servers = [...data].sort((a, b) =>
+            String(a.name ?? "").localeCompare(String(b.name ?? "")),
+          );
+          for (const server of servers) {
+            const name = String(server.name ?? "unknown");
+            const authStatus = server.authStatus ?? server.auth_status ?? null;
+            const authLabel =
+              typeof authStatus === "string"
+                ? authStatus
+                : authStatus &&
+                    typeof authStatus === "object" &&
+                    "status" in authStatus
+                  ? String((authStatus as { status?: unknown }).status ?? "")
+                  : "";
+            lines.push(`- ${name}${authLabel ? ` (auth: ${authLabel})` : ""}`);
+
+            const toolsRecord =
+              server.tools && typeof server.tools === "object"
+                ? (server.tools as Record<string, unknown>)
+                : {};
+            const prefix = `mcp__${name}__`;
+            const toolNames = Object.keys(toolsRecord)
+              .map((toolName) =>
+                toolName.startsWith(prefix)
+                  ? toolName.slice(prefix.length)
+                  : toolName,
+              )
+              .sort((a, b) => a.localeCompare(b));
+            lines.push(
+              toolNames.length > 0
+                ? `  tools: ${toolNames.join(", ")}`
+                : "  tools: none",
+            );
+
+            const resources = Array.isArray(server.resources)
+              ? server.resources.length
+              : 0;
+            const templates = Array.isArray(server.resourceTemplates)
+              ? server.resourceTemplates.length
+              : Array.isArray(server.resource_templates)
+                ? server.resource_templates.length
+                : 0;
+            if (resources > 0 || templates > 0) {
+              lines.push(`  resources: ${resources}, templates: ${templates}`);
+            }
+          }
+        }
+
+        const timestamp = Date.now();
+        recordThreadActivity(activeWorkspace.id, threadId, timestamp);
+        dispatch({
+          type: "addAssistantMessage",
+          threadId,
+          text: lines.join("\n"),
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to load MCP status.";
+        dispatch({
+          type: "addAssistantMessage",
+          threadId,
+          text: `MCP tools:\n- ${message}`,
+        });
+      } finally {
+        safeMessageActivity();
+      }
+    },
+    [
+      activeWorkspace,
+      dispatch,
+      ensureThreadForActiveWorkspace,
+      recordThreadActivity,
+      safeMessageActivity,
+    ],
+  );
+
+  const startFork = useCallback(
+    async (text: string) => {
+      if (!activeWorkspace || !activeThreadId) {
+        return;
+      }
+      const trimmed = text.trim();
+      const rest = trimmed.replace(/^\/fork\b/i, "").trim();
+      const threadId = await forkThreadForWorkspace(activeWorkspace.id, activeThreadId);
+      if (!threadId) {
+        return;
+      }
+      updateThreadParent(activeThreadId, [threadId]);
+      if (rest) {
+        await sendMessageToThread(activeWorkspace, threadId, rest, []);
+      }
+    },
+    [
+      activeThreadId,
+      activeWorkspace,
+      forkThreadForWorkspace,
+      sendMessageToThread,
+      updateThreadParent,
+    ],
+  );
+
   const startResume = useCallback(
     async (_text: string) => {
       if (!activeWorkspace) {
@@ -798,8 +931,10 @@ export function useThreadMessaging({
     interruptTurn,
     sendUserMessage,
     sendUserMessageToThread,
+    startFork,
     startReview,
     startResume,
+    startMcp,
     startStatus,
     reviewPrompt,
     openReviewPrompt,

@@ -24,8 +24,10 @@ const makeOptions = (
   startThreadForWorkspace: vi.fn().mockResolvedValue("thread-1"),
   sendUserMessage: vi.fn().mockResolvedValue(undefined),
   sendUserMessageToThread: vi.fn().mockResolvedValue(undefined),
+  startFork: vi.fn().mockResolvedValue(undefined),
   startReview: vi.fn().mockResolvedValue(undefined),
   startResume: vi.fn().mockResolvedValue(undefined),
+  startMcp: vi.fn().mockResolvedValue(undefined),
   startStatus: vi.fn().mockResolvedValue(undefined),
   clearActiveImages: vi.fn(),
   ...overrides,
@@ -290,6 +292,22 @@ describe("useQueuedSend", () => {
     expect(options.startReview).not.toHaveBeenCalled();
   });
 
+  it("routes /mcp to the MCP handler", async () => {
+    const startMcp = vi.fn().mockResolvedValue(undefined);
+    const options = makeOptions({ startMcp });
+    const { result } = renderHook((props) => useQueuedSend(props), {
+      initialProps: options,
+    });
+
+    await act(async () => {
+      await result.current.handleSend("/mcp now", ["img-1"]);
+    });
+
+    expect(startMcp).toHaveBeenCalledWith("/mcp now");
+    expect(options.sendUserMessage).not.toHaveBeenCalled();
+    expect(options.startReview).not.toHaveBeenCalled();
+  });
+
   it("routes /resume to the resume handler", async () => {
     const startResume = vi.fn().mockResolvedValue(undefined);
     const options = makeOptions({ startResume });
@@ -302,6 +320,22 @@ describe("useQueuedSend", () => {
     });
 
     expect(startResume).toHaveBeenCalledWith("/resume now");
+    expect(options.sendUserMessage).not.toHaveBeenCalled();
+    expect(options.startReview).not.toHaveBeenCalled();
+  });
+
+  it("routes /fork to the fork handler", async () => {
+    const startFork = vi.fn().mockResolvedValue(undefined);
+    const options = makeOptions({ startFork });
+    const { result } = renderHook((props) => useQueuedSend(props), {
+      initialProps: options,
+    });
+
+    await act(async () => {
+      await result.current.handleSend("/fork branch here", ["img-1"]);
+    });
+
+    expect(startFork).toHaveBeenCalledWith("/fork branch here");
     expect(options.sendUserMessage).not.toHaveBeenCalled();
     expect(options.startReview).not.toHaveBeenCalled();
   });

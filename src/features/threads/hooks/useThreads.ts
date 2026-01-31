@@ -113,7 +113,7 @@ export function useThreads({
       // Ignore refresh errors to avoid breaking the UI.
     }
   }, [onMessageActivity]);
-  const { applyCollabThreadLinks, applyCollabThreadLinksFromThread } =
+  const { applyCollabThreadLinks, applyCollabThreadLinksFromThread, updateThreadParent } =
     useThreadLinking({
       dispatch,
       threadParentById: state.threadParentById,
@@ -128,10 +128,17 @@ export function useThreads({
     [onWorkspaceConnected, refreshAccountRateLimits, refreshAccountInfo],
   );
 
+  const isThreadHidden = useCallback(
+    (workspaceId: string, threadId: string) =>
+      Boolean(state.hiddenThreadIdsByWorkspace[workspaceId]?.[threadId]),
+    [state.hiddenThreadIdsByWorkspace],
+  );
+
   const handlers = useThreadEventHandlers({
     activeThreadId,
     dispatch,
     getCustomName,
+    isThreadHidden,
     markProcessing,
     markReviewing,
     setActiveTurnId,
@@ -149,6 +156,7 @@ export function useThreads({
 
   const {
     startThreadForWorkspace,
+    forkThreadForWorkspace,
     resumeThreadForWorkspace,
     refreshThread,
     resetWorkspaceThreads,
@@ -227,8 +235,10 @@ export function useThreads({
     interruptTurn,
     sendUserMessage,
     sendUserMessageToThread,
+    startFork,
     startReview,
     startResume,
+    startMcp,
     startStatus,
     reviewPrompt,
     openReviewPrompt,
@@ -278,6 +288,8 @@ export function useThreads({
     ensureThreadForActiveWorkspace,
     ensureThreadForWorkspace,
     refreshThread,
+    forkThreadForWorkspace,
+    updateThreadParent,
   });
 
   const setActiveThreadId = useCallback(
@@ -353,14 +365,17 @@ export function useThreads({
     renameThread,
     startThread,
     startThreadForWorkspace,
+    forkThreadForWorkspace,
     listThreadsForWorkspace,
     refreshThread,
     resetWorkspaceThreads,
     loadOlderThreadsForWorkspace,
     sendUserMessage,
     sendUserMessageToThread,
+    startFork,
     startReview,
     startResume,
+    startMcp,
     startStatus,
     reviewPrompt,
     openReviewPrompt,

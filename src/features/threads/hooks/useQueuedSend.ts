@@ -19,8 +19,10 @@ type UseQueuedSendOptions = {
     text: string,
     images?: string[],
   ) => Promise<void>;
+  startFork: (text: string) => Promise<void>;
   startReview: (text: string) => Promise<void>;
   startResume: (text: string) => Promise<void>;
+  startMcp: (text: string) => Promise<void>;
   startStatus: (text: string) => Promise<void>;
   clearActiveImages: () => void;
 };
@@ -33,9 +35,15 @@ type UseQueuedSendResult = {
   removeQueuedMessage: (threadId: string, messageId: string) => void;
 };
 
-type SlashCommandKind = "new" | "resume" | "review" | "status";
+type SlashCommandKind = "fork" | "mcp" | "new" | "resume" | "review" | "status";
 
 function parseSlashCommand(text: string): SlashCommandKind | null {
+  if (/^\/fork\b/i.test(text)) {
+    return "fork";
+  }
+  if (/^\/mcp\b/i.test(text)) {
+    return "mcp";
+  }
   if (/^\/review\b/i.test(text)) {
     return "review";
   }
@@ -61,8 +69,10 @@ export function useQueuedSend({
   startThreadForWorkspace,
   sendUserMessage,
   sendUserMessageToThread,
+  startFork,
   startReview,
   startResume,
+  startMcp,
   startStatus,
   clearActiveImages,
 }: UseQueuedSendOptions): UseQueuedSendResult {
@@ -109,12 +119,20 @@ export function useQueuedSend({
 
   const runSlashCommand = useCallback(
     async (command: SlashCommandKind, trimmed: string) => {
+      if (command === "fork") {
+        await startFork(trimmed);
+        return;
+      }
       if (command === "review") {
         await startReview(trimmed);
         return;
       }
       if (command === "resume") {
         await startResume(trimmed);
+        return;
+      }
+      if (command === "mcp") {
+        await startMcp(trimmed);
         return;
       }
       if (command === "status") {
@@ -132,8 +150,10 @@ export function useQueuedSend({
     [
       activeWorkspace,
       sendUserMessageToThread,
+      startFork,
       startReview,
       startResume,
+      startMcp,
       startStatus,
       startThreadForWorkspace,
     ],

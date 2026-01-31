@@ -122,6 +122,7 @@ export type ThreadState = {
   activeThreadIdByWorkspace: Record<string, string | null>;
   itemsByThread: Record<string, ConversationItem[]>;
   threadsByWorkspace: Record<string, ThreadSummary[]>;
+  hiddenThreadIdsByWorkspace: Record<string, Record<string, true>>;
   threadParentById: Record<string, string>;
   threadStatusById: Record<string, ThreadActivityStatus>;
   threadListLoadingByWorkspace: Record<string, boolean>;
@@ -141,6 +142,7 @@ export type ThreadState = {
 export type ThreadAction =
   | { type: "setActiveThreadId"; workspaceId: string; threadId: string | null }
   | { type: "ensureThread"; workspaceId: string; threadId: string }
+  | { type: "hideThread"; workspaceId: string; threadId: string }
   | { type: "removeThread"; workspaceId: string; threadId: string }
   | { type: "setThreadParent"; threadId: string; parentId: string }
   | {
@@ -253,6 +255,7 @@ export const initialState: ThreadState = {
   activeThreadIdByWorkspace: {},
   itemsByThread: emptyItems,
   threadsByWorkspace: {},
+  hiddenThreadIdsByWorkspace: {},
   threadParentById: {},
   threadStatusById: {},
   threadListLoadingByWorkspace: {},
@@ -393,6 +396,12 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
           : state.threadStatusById,
       };
     case "ensureThread": {
+      const hidden =
+        state.hiddenThreadIdsByWorkspace[action.workspaceId]?.[action.threadId] ??
+        false;
+      if (hidden) {
+        return state;
+      }
       const list = state.threadsByWorkspace[action.workspaceId] ?? [];
       if (list.some((thread) => thread.id === action.threadId)) {
         return state;
@@ -422,6 +431,41 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
           ...state.activeThreadIdByWorkspace,
           [action.workspaceId]:
             state.activeThreadIdByWorkspace[action.workspaceId] ?? action.threadId,
+        },
+      };
+    }
+    case "hideThread": {
+      const hiddenForWorkspace =
+        state.hiddenThreadIdsByWorkspace[action.workspaceId] ?? {};
+      if (hiddenForWorkspace[action.threadId]) {
+        return state;
+      }
+
+      const nextHiddenForWorkspace = {
+        ...hiddenForWorkspace,
+        [action.threadId]: true as const,
+      };
+
+      const list = state.threadsByWorkspace[action.workspaceId] ?? [];
+      const filtered = list.filter((thread) => thread.id !== action.threadId);
+      const nextActive =
+        state.activeThreadIdByWorkspace[action.workspaceId] === action.threadId
+          ? filtered[0]?.id ?? null
+          : state.activeThreadIdByWorkspace[action.workspaceId] ?? null;
+
+      return {
+        ...state,
+        hiddenThreadIdsByWorkspace: {
+          ...state.hiddenThreadIdsByWorkspace,
+          [action.workspaceId]: nextHiddenForWorkspace,
+        },
+        threadsByWorkspace: {
+          ...state.threadsByWorkspace,
+          [action.workspaceId]: filtered,
+        },
+        activeThreadIdByWorkspace: {
+          ...state.activeThreadIdByWorkspace,
+          [action.workspaceId]: nextActive,
         },
       };
     }
@@ -942,11 +986,13 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
         ),
       };
     case "setThreads": {
+      const hidden = state.hiddenThreadIdsByWorkspace[action.workspaceId] ?? {};
+      const visibleThreads = action.threads.filter((thread) => !hidden[thread.id]);
       return {
         ...state,
         threadsByWorkspace: {
           ...state.threadsByWorkspace,
-          [action.workspaceId]: action.threads,
+          [action.workspaceId]: visibleThreads,
         },
       };
     }

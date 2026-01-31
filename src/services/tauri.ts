@@ -244,6 +244,10 @@ export async function startThread(workspaceId: string) {
   return invoke<any>("start_thread", { workspaceId });
 }
 
+export async function forkThread(workspaceId: string, threadId: string) {
+  return invoke<any>("fork_thread", { workspaceId, threadId });
+}
+
 export async function sendUserMessage(
   workspaceId: string,
   threadId: string,
@@ -750,6 +754,14 @@ export async function listThreads(
   limit?: number | null,
 ) {
   return invoke<any>("list_threads", { workspaceId, cursor, limit });
+}
+
+export async function listMcpServerStatus(
+  workspaceId: string,
+  cursor?: string | null,
+  limit?: number | null,
+) {
+  return invoke<any>("list_mcp_server_status", { workspaceId, cursor, limit });
 }
 
 export async function listTasks(): Promise<TaskEntry[]> {

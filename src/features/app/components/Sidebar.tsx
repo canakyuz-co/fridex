@@ -236,7 +236,7 @@ export function Sidebar({
   const accountSwitchDisabled = accountSwitching || !activeWorkspaceId;
   const accountCancelDisabled = !accountSwitching || !activeWorkspaceId;
 
-  const pinnedThreadRows = (() => {
+  const pinnedThreadRows = useMemo(() => {
     type ThreadRow = { thread: ThreadSummary; depth: number };
     const groups: Array<{
       pinTime: number;
@@ -297,7 +297,13 @@ export function Sidebar({
           workspaceId: group.workspaceId,
         })),
       );
-  })();
+  }, [
+    workspaces,
+    threadsByWorkspace,
+    getThreadRows,
+    getPinTimestamp,
+    isWorkspaceMatch,
+  ]);
 
   const scrollFadeDeps = useMemo(
     () => [groupedWorkspaces, threadsByWorkspace, expandedWorkspaces, normalizedQuery],

@@ -1,6 +1,6 @@
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -81,6 +81,16 @@ pub(crate) async fn resume_thread_core(
     session.send_request("thread/resume", params).await
 }
 
+pub(crate) async fn fork_thread_core(
+    sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
+    workspace_id: String,
+    thread_id: String,
+) -> Result<Value, String> {
+    let session = get_session_clone(sessions, &workspace_id).await?;
+    let params = json!({ "threadId": thread_id });
+    session.send_request("thread/fork", params).await
+}
+
 pub(crate) async fn list_threads_core(
     sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
     workspace_id: String,
@@ -90,6 +100,17 @@ pub(crate) async fn list_threads_core(
     let session = get_session_clone(sessions, &workspace_id).await?;
     let params = json!({ "cursor": cursor, "limit": limit });
     session.send_request("thread/list", params).await
+}
+
+pub(crate) async fn list_mcp_server_status_core(
+    sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
+    workspace_id: String,
+    cursor: Option<String>,
+    limit: Option<u32>,
+) -> Result<Value, String> {
+    let session = get_session_clone(sessions, &workspace_id).await?;
+    let params = json!({ "cursor": cursor, "limit": limit });
+    session.send_request("mcpServerStatus/list", params).await
 }
 
 pub(crate) async fn archive_thread_core(
@@ -216,10 +237,143 @@ pub(crate) async fn start_review_core(
 
 pub(crate) async fn model_list_core(
     sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
     workspace_id: String,
 ) -> Result<Value, String> {
     let session = get_session_clone(sessions, &workspace_id).await?;
-    session.send_request("model/list", json!({})).await
+    let mut response = session.send_request("model/list", json!({})).await?;
+    if let Ok(codex_home) = resolve_codex_home_for_workspace_core(workspaces, &workspace_id).await {
+        if let Some(cache_models) = read_models_cache_entries(&codex_home) {
+            merge_model_cache_entries(&mut response, cache_models);
+        }
+    }
+    Ok(response)
+}
+
+fn read_models_cache_entries(codex_home: &Path) -> Option<Vec<Value>> {
+    let cache_path = codex_home.join("models_cache.json");
+    let contents = std::fs::read_to_string(cache_path).ok()?;
+    let parsed: Value = serde_json::from_str(&contents).ok()?;
+    let models = parsed.get("models")?.as_array()?;
+    let mut entries = Vec::with_capacity(models.len());
+    for model in models {
+        if model
+            .get("visibility")
+            .and_then(|value| value.as_str())
+            != Some("list")
+        {
+            continue;
+        }
+        let slug = model.get("slug")?.as_str()?.trim();
+        if slug.is_empty() {
+            continue;
+        }
+        let display_name = model
+            .get("display_name")
+            .and_then(|value| value.as_str())
+            .unwrap_or(slug);
+        let description = model
+            .get("description")
+            .and_then(|value| value.as_str())
+            .unwrap_or("");
+        let supported_levels = model
+            .get("supported_reasoning_levels")
+            .and_then(|value| value.as_array())
+            .map(|levels| {
+                levels
+                    .iter()
+                    .filter_map(|level| {
+                        let effort = level.get("effort")?.as_str()?.trim();
+                        if effort.is_empty() {
+                            return None;
+                        }
+                        Some(json!({
+                            "reasoning_effort": effort,
+                            "description": level
+                                .get("description")
+                                .and_then(|value| value.as_str())
+                                .unwrap_or("")
+                        }))
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let default_effort = model
+            .get("default_reasoning_level")
+            .and_then(|value| value.as_str())
+            .map(|value| value.trim())
+            .filter(|value| !value.is_empty());
+
+        let mut entry = Map::new();
+        entry.insert("id".to_string(), json!(slug));
+        entry.insert("model".to_string(), json!(slug));
+        entry.insert("displayName".to_string(), json!(display_name));
+        entry.insert("description".to_string(), json!(description));
+        entry.insert(
+            "supported_reasoning_efforts".to_string(),
+            json!(supported_levels),
+        );
+        if let Some(default_effort) = default_effort {
+            entry.insert(
+                "default_reasoning_effort".to_string(),
+                json!(default_effort),
+            );
+        }
+        entries.push(Value::Object(entry));
+    }
+    Some(entries)
+}
+
+fn merge_model_cache_entries(response: &mut Value, cache_entries: Vec<Value>) {
+    let list_value = match response {
+        Value::Object(map) => {
+            if let Some(result) = map.get_mut("result") {
+                match result {
+                    Value::Object(result_map) => result_map.get_mut("data"),
+                    _ => None,
+                }
+            } else {
+                map.get_mut("data")
+            }
+        }
+        _ => None,
+    };
+    let Some(Value::Array(list)) = list_value else {
+        return;
+    };
+
+    let mut known_ids = std::collections::HashSet::with_capacity(list.len());
+    for item in list.iter() {
+        if let Some(id) = model_id_from_value(item) {
+            known_ids.insert(id);
+        }
+    }
+
+    for entry in cache_entries {
+        let Some(id) = model_id_from_value(&entry) else {
+            continue;
+        };
+        if known_ids.contains(&id) {
+            continue;
+        }
+        known_ids.insert(id);
+        list.push(entry);
+    }
+}
+
+fn model_id_from_value(value: &Value) -> Option<String> {
+    let obj = value.as_object()?;
+    let candidate = obj
+        .get("id")
+        .and_then(|value| value.as_str())
+        .or_else(|| obj.get("model").and_then(|value| value.as_str()))
+        .or_else(|| obj.get("slug").and_then(|value| value.as_str()))?;
+    let trimmed = candidate.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
 pub(crate) async fn account_rate_limits_core(

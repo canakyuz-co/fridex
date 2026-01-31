@@ -11,6 +11,7 @@ type ThreadEventHandlersOptions = {
   activeThreadId: string | null;
   dispatch: Dispatch<ThreadAction>;
   getCustomName: (workspaceId: string, threadId: string) => string | undefined;
+  isThreadHidden: (workspaceId: string, threadId: string) => boolean;
   markProcessing: (threadId: string, isProcessing: boolean) => void;
   markReviewing: (threadId: string, isReviewing: boolean) => void;
   setActiveTurnId: (threadId: string, turnId: string | null) => void;
@@ -35,6 +36,7 @@ export function useThreadEventHandlers({
   activeThreadId,
   dispatch,
   getCustomName,
+  isThreadHidden,
   markProcessing,
   markReviewing,
   setActiveTurnId,
@@ -76,6 +78,7 @@ export function useThreadEventHandlers({
   });
 
   const {
+    onThreadStarted,
     onTurnStarted,
     onTurnCompleted,
     onTurnPlanUpdated,
@@ -85,6 +88,8 @@ export function useThreadEventHandlers({
     onContextCompacted,
   } = useThreadTurnEvents({
     dispatch,
+    getCustomName,
+    isThreadHidden,
     markProcessing,
     markReviewing,
     setActiveTurnId,
@@ -93,6 +98,16 @@ export function useThreadEventHandlers({
     safeMessageActivity,
     recordThreadActivity,
   });
+
+  const onBackgroundThreadAction = useCallback(
+    (workspaceId: string, threadId: string, action: string) => {
+      if (action !== "hide") {
+        return;
+      }
+      dispatch({ type: "hideThread", workspaceId, threadId });
+    },
+    [dispatch],
+  );
 
   const onAppServerEvent = useCallback(
     (event: AppServerEvent) => {
@@ -114,6 +129,7 @@ export function useThreadEventHandlers({
       onWorkspaceConnected,
       onApprovalRequest,
       onRequestUserInput,
+      onBackgroundThreadAction,
       onAppServerEvent,
       onAgentMessageDelta,
       onAgentMessageCompleted,
@@ -125,6 +141,7 @@ export function useThreadEventHandlers({
       onCommandOutputDelta,
       onTerminalInteraction,
       onFileChangeOutputDelta,
+      onThreadStarted,
       onTurnStarted,
       onTurnCompleted,
       onTurnPlanUpdated,
@@ -137,6 +154,7 @@ export function useThreadEventHandlers({
       onWorkspaceConnected,
       onApprovalRequest,
       onRequestUserInput,
+      onBackgroundThreadAction,
       onAppServerEvent,
       onAgentMessageDelta,
       onAgentMessageCompleted,
@@ -148,6 +166,7 @@ export function useThreadEventHandlers({
       onCommandOutputDelta,
       onTerminalInteraction,
       onFileChangeOutputDelta,
+      onThreadStarted,
       onTurnStarted,
       onTurnCompleted,
       onTurnPlanUpdated,
