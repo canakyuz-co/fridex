@@ -21,6 +21,11 @@
   padding-top: var(--main-topbar-height);
   background: var(--surface-right-panel);
   border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  -webkit-app-region: no-drag;
 }
 
 .editor-placeholder {
