@@ -65,7 +65,10 @@ use std::sync::Arc;
 use ignore::WalkBuilder;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::process::Command;
 use tokio::sync::{broadcast, mpsc, oneshot, Mutex};
+
+use crate::utils::{git_env_path, resolve_git_binary};
 
 use backend::app_server::{
     spawn_workspace_session, WorkspaceSession,

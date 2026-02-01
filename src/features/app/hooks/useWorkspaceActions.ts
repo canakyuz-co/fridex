@@ -2,6 +2,7 @@ import type { RefObject } from "react";
 import { useCallback } from "react";
 import * as Sentry from "@sentry/react";
 import { useNewAgentShortcut } from "./useNewAgentShortcut";
+import { pushErrorToast } from "../../../services/toasts";
 import type { DebugEntry, WorkspaceInfo } from "../../../types";
 
 type Params = {
@@ -90,30 +91,46 @@ export function useWorkspaceActions({
 
   const handleAddAgent = useCallback(
     async (workspace: WorkspaceInfo) => {
-      exitDiffView();
-      selectWorkspace(workspace.id);
-      if (!workspace.connected) {
-        await connectWorkspace(workspace);
-      }
-      const threadId = await startThreadForWorkspace(workspace.id);
-      if (threadId) {
-        Sentry.metrics.count("agent_created", 1, {
-          attributes: {
-            workspace_id: workspace.id,
-            thread_id: threadId,
-          },
+      try {
+        exitDiffView();
+        selectWorkspace(workspace.id);
+        if (!workspace.connected) {
+          await connectWorkspace(workspace);
+        }
+        const threadId = await startThreadForWorkspace(workspace.id);
+        if (threadId) {
+          Sentry.metrics.count("agent_created", 1, {
+            attributes: {
+              workspace_id: workspace.id,
+              thread_id: threadId,
+            },
+          });
+        }
+        if (isCompact) {
+          setActiveTab("codex");
+        }
+        setTimeout(() => composerInputRef.current?.focus(), 0);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        onDebug({
+          id: `${Date.now()}-client-add-agent-error`,
+          timestamp: Date.now(),
+          source: "error",
+          label: "agent/add error",
+          payload: message,
+        });
+        pushErrorToast({
+          title: "Failed to create agent",
+          message,
         });
       }
-      if (isCompact) {
-        setActiveTab("codex");
-      }
-      setTimeout(() => composerInputRef.current?.focus(), 0);
     },
     [
       composerInputRef,
       connectWorkspace,
       exitDiffView,
       isCompact,
+      onDebug,
       selectWorkspace,
       setActiveTab,
       startThreadForWorkspace,

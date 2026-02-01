@@ -87,6 +87,7 @@ pub async fn send_claude_cli_message(
 
     // Add default args for stream-json output
     cmd.arg("--print");
+    cmd.arg("--verbose");
     cmd.arg("--output-format");
     cmd.arg("stream-json");
 
@@ -117,7 +118,13 @@ pub async fn send_claude_cli_message(
         .take()
         .ok_or_else(|| "Failed to capture stdout".to_string())?;
 
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "Failed to capture stderr".to_string())?;
+
     let reader = BufReader::new(stdout);
+    let stderr_reader = BufReader::new(stderr);
     let mut accumulated_text = String::new();
     let mut session_id: Option<String> = None;
     let mut model: Option<String> = None;
@@ -252,11 +259,28 @@ pub async fn send_claude_cli_message(
     let status = child.wait().map_err(|e| format!("Process error: {}", e))?;
 
     if !status.success() {
+        // Read stderr for detailed error message
+        let stderr_output: String = stderr_reader
+            .lines()
+            .filter_map(|line| line.ok())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let error_msg = if stderr_output.is_empty() {
+            format!("CLI exited with code: {}", status.code().unwrap_or(-1))
+        } else {
+            format!(
+                "CLI exited with code: {}\n{}",
+                status.code().unwrap_or(-1),
+                stderr_output
+            )
+        };
+
         let _ = on_event.send(ClaudeCliEvent {
             event_type: "error".to_string(),
             content: None,
             usage: None,
-            error: Some(format!("CLI exited with code: {}", status.code().unwrap_or(-1))),
+            error: Some(error_msg),
             session_id,
             model,
         });
