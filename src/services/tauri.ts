@@ -956,6 +956,24 @@ export async function sendGeminiMessageSync(
   });
 }
 
+export type GeminiCliResponse = {
+  content: string;
+};
+
+export async function sendGeminiCliMessageSync(
+  command: string,
+  args: string | null,
+  prompt: string,
+  cwd: string | null,
+): Promise<GeminiCliResponse> {
+  return invoke<GeminiCliResponse>("send_gemini_cli_message_sync", {
+    command,
+    args,
+    prompt,
+    cwd,
+  });
+}
+
 // Claude CLI types
 export type ClaudeCliUsage = {
   inputTokens: number;

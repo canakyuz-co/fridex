@@ -17,6 +17,7 @@ import {
   sendClaudeMessage,
   sendClaudeCliMessage,
   sendClaudeMessageSync,
+  sendGeminiCliMessageSync,
   sendGeminiMessageSync,
   type ClaudeMessage,
   type ClaudeRateLimits,
@@ -533,11 +534,14 @@ export function useThreadMessaging({
         }
 
         if (provider && provider.provider === "gemini") {
-          if (!provider.apiKey) {
+          const useCli = Boolean(provider.command);
+          const useApi = Boolean(provider.apiKey) && !useCli;
+
+          if (!useCli && !useApi) {
             markProcessing(threadId, false);
             pushThreadErrorMessage(
               threadId,
-              "Gemini not configured. Set API key in Settings > Other AI."
+              "Gemini not configured. Set CLI command or API key in Settings > Other AI."
             );
             safeMessageActivity();
             return;
@@ -566,11 +570,18 @@ export function useThreadMessaging({
             let plan = null;
             while (attempt < 2 && !plan) {
               const promptText = buildPlanPrompt(finalText, attempt);
-              const response = await sendGeminiMessageSync(
-                provider.apiKey!,
-                modelName,
-                promptText,
-              );
+              const response = useCli
+                ? await sendGeminiCliMessageSync(
+                    provider.command!,
+                    provider.args ?? null,
+                    promptText,
+                    workspace.path,
+                  )
+                : await sendGeminiMessageSync(
+                    provider.apiKey!,
+                    modelName,
+                    promptText,
+                  );
               plan = normalizePlanPayload(extractPlanJson(response.content));
               attempt += 1;
             }
@@ -605,11 +616,18 @@ export function useThreadMessaging({
             return;
           }
 
-          const response = await sendGeminiMessageSync(
-            provider.apiKey!,
-            modelName,
-            finalText,
-          );
+          const response = useCli
+            ? await sendGeminiCliMessageSync(
+                provider.command!,
+                provider.args ?? null,
+                finalText,
+                workspace.path,
+              )
+            : await sendGeminiMessageSync(
+                provider.apiKey!,
+                modelName,
+                finalText,
+              );
           dispatch({
             type: "upsertItem",
             workspaceId: workspace.id,
