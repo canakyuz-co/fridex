@@ -95,6 +95,7 @@ import { useLiquidGlassEffect } from "./features/app/hooks/useLiquidGlassEffect"
 import { useCopyThread } from "./features/threads/hooks/useCopyThread";
 import { useTerminalController } from "./features/terminal/hooks/useTerminalController";
 import { useWorkspaceLaunchScript } from "./features/app/hooks/useWorkspaceLaunchScript";
+import { useWorkspaceLaunchScripts } from "./features/app/hooks/useWorkspaceLaunchScripts";
 import { useWorktreeSetupScript } from "./features/app/hooks/useWorktreeSetupScript";
 import { useGitCommitController } from "./features/app/hooks/useGitCommitController";
 import { useTasks } from "./features/tasks/hooks/useTasks";
@@ -856,6 +857,69 @@ function MainApp() {
       openRenameWorktreePrompt(activeWorkspace.id);
     }
   }, [activeWorkspace, openRenameWorktreePrompt]);
+
+  const {
+    terminalTabs,
+    activeTerminalId,
+    onSelectTerminal,
+    onNewTerminal,
+    onCloseTerminal,
+    terminalState,
+    ensureTerminalWithTitle,
+    restartTerminalSession,
+  } = useTerminalController({
+    activeWorkspaceId,
+    activeWorkspace,
+    terminalOpen,
+    onCloseTerminalPanel: closeTerminalPanel,
+    onDebug: addDebugEntry,
+  });
+
+  const ensureLaunchTerminal = useCallback(
+    (workspaceId: string) => ensureTerminalWithTitle(workspaceId, "launch", "Launch"),
+    [ensureTerminalWithTitle],
+  );
+
+  const launchScriptState = useWorkspaceLaunchScript({
+    activeWorkspace,
+    updateWorkspaceSettings,
+    openTerminal,
+    ensureLaunchTerminal,
+    restartLaunchSession: restartTerminalSession,
+    terminalState,
+    activeTerminalId,
+  });
+
+  const launchScriptsState = useWorkspaceLaunchScripts({
+    activeWorkspace,
+    updateWorkspaceSettings,
+    openTerminal,
+    ensureLaunchTerminal: (workspaceId, entry, title) => {
+      const label = entry.label?.trim() || entry.icon;
+      return ensureTerminalWithTitle(
+        workspaceId,
+        `launch:${entry.id}`,
+        title || `Launch ${label}`,
+      );
+    },
+    restartLaunchSession: restartTerminalSession,
+    terminalState,
+    activeTerminalId,
+  });
+
+  const worktreeSetupScriptState = useWorktreeSetupScript({
+    ensureTerminalWithTitle,
+    restartTerminalSession,
+    openTerminal,
+    onDebug: addDebugEntry,
+  });
+
+  const handleWorktreeCreated = useCallback(
+    async (worktree: WorkspaceInfo, _parentWorkspace?: WorkspaceInfo) => {
+      await worktreeSetupScriptState.maybeRunWorktreeSetupScript(worktree);
+    },
+    [worktreeSetupScriptState],
+  );
 
   const { exitDiffView, selectWorkspace, selectHome } = useWorkspaceSelection({
     workspaces,
@@ -1882,6 +1946,7 @@ const {
     onCloseLaunchScriptEditor: launchScriptState.onCloseEditor,
     onLaunchScriptDraftChange: launchScriptState.onDraftScriptChange,
     onSaveLaunchScript: launchScriptState.onSaveLaunchScript,
+    launchScriptsState,
     mainHeaderActionsNode: (
       <MainHeaderActions
         centerMode={centerMode}
