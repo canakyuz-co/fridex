@@ -65,6 +65,7 @@ const baseSettings: AppSettings = {
   cycleAgentPrevShortcut: null,
   cycleWorkspaceNextShortcut: null,
   cycleWorkspacePrevShortcut: null,
+  editorKeymap: "jetbrains",
   lastComposerModelId: null,
   lastComposerReasoningEffort: null,
   uiScale: 1,
