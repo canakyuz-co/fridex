@@ -191,13 +191,6 @@ function resolveRateLimitsByModel(
 
 
 function MainApp() {
-  async function handleWorktreeCreated(
-    worktree: WorkspaceInfo,
-    _parentWorkspace?: WorkspaceInfo,
-  ) {
-    await worktreeSetupScriptState.maybeRunWorktreeSetupScript(worktree);
-  }
-
   const {
     appSettings,
     setAppSettings,
@@ -1658,44 +1651,6 @@ function MainApp() {
     ? centerMode === "chat" || centerMode === "diff"
     : (isTablet ? tabletTab : activeTab) === "codex") && !showWorkspaceHome;
   const showGitDetail = Boolean(selectedDiffPath) && isPhone;
-const {
-    terminalTabs,
-    activeTerminalId,
-    onSelectTerminal,
-    onNewTerminal,
-    onCloseTerminal,
-    terminalState,
-    ensureTerminalWithTitle,
-    restartTerminalSession,
-  } = useTerminalController({
-    activeWorkspaceId,
-    activeWorkspace,
-    terminalOpen,
-    onCloseTerminalPanel: closeTerminalPanel,
-    onDebug: addDebugEntry,
-  });
-
-  const ensureLaunchTerminal = useCallback(
-    (workspaceId: string) => ensureTerminalWithTitle(workspaceId, "launch", "Launch"),
-    [ensureTerminalWithTitle],
-  );
-
-  const launchScriptState = useWorkspaceLaunchScript({
-    activeWorkspace,
-    updateWorkspaceSettings,
-    openTerminal,
-    ensureLaunchTerminal,
-    restartLaunchSession: restartTerminalSession,
-    terminalState,
-    activeTerminalId,
-  });
-
-  const worktreeSetupScriptState = useWorktreeSetupScript({
-    ensureTerminalWithTitle,
-    restartTerminalSession,
-    openTerminal,
-    onDebug: addDebugEntry,
-  });
 
   const isThreadOpen = Boolean(activeThreadId && showComposer);
 

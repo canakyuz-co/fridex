@@ -312,13 +312,6 @@ pub(crate) struct LaunchScriptEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct WorktreeSetupStatus {
-    #[serde(rename = "shouldRun")]
-    pub(crate) should_run: bool,
-    pub(crate) script: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct OpenAppTarget {
     pub(crate) id: String,
     pub(crate) label: String,
