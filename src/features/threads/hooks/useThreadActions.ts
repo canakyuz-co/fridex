@@ -60,8 +60,18 @@ export function useThreadActions({
   applyCollabThreadLinksFromThread,
 }: UseThreadActionsOptions) {
   const extractThreadId = useCallback((response: Record<string, any>) => {
-    const thread = response.result?.thread ?? response.thread ?? null;
-    return String(thread?.id ?? "");
+    const result = response.result ?? null;
+    const threadId =
+      result?.threadId ??
+      result?.thread_id ??
+      result?.thread?.id ??
+      result?.id ??
+      response.threadId ??
+      response.thread_id ??
+      response.thread?.id ??
+      response.id ??
+      "";
+    return String(threadId ?? "");
   }, []);
 
   const startThreadForWorkspace = useCallback(
@@ -83,6 +93,10 @@ export function useThreadActions({
           label: "thread/start response",
           payload: response,
         });
+        const responseError = response?.error?.message ?? response?.error;
+        if (responseError) {
+          throw new Error(String(responseError));
+        }
         const threadId = extractThreadId(response);
         if (threadId) {
           dispatch({ type: "ensureThread", workspaceId, threadId });
@@ -92,7 +106,7 @@ export function useThreadActions({
           loadedThreadsRef.current[threadId] = true;
           return threadId;
         }
-        return null;
+        throw new Error("Thread start did not return a thread id.");
       } catch (error) {
         onDebug?.({
           id: `${Date.now()}-client-thread-start-error`,

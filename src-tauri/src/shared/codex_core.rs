@@ -66,7 +66,7 @@ pub(crate) async fn start_thread_core(
     let session = get_session_clone(sessions, &workspace_id).await?;
     let params = json!({
         "cwd": session.entry.path,
-        "approvalPolicy": "onRequest"
+        "approvalPolicy": "on-request"
     });
     session.send_request("thread/start", params).await
 }
