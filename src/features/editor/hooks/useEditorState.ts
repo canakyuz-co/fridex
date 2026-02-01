@@ -52,34 +52,34 @@ export function useEditorState({
     if (!paths.length) {
       return null;
     }
-    const candidates = paths
-      .map((path) => {
-        const name = path.split("/").pop() ?? path;
-        const lower = name.toLowerCase();
-        if (!lower.startsWith("readme")) {
-          return null;
-        }
-        const isExactMd = lower === "readme.md";
-        const isExactMdx = lower === "readme.mdx";
-        const isExact = lower === "readme";
-        const extensionWeight = isExactMd ? 0 : isExactMdx ? 1 : isExact ? 2 : 3;
-        const depth = path.split("/").length;
-        return { path, extensionWeight, depth, length: path.length };
-      })
-      .filter((value): value is NonNullable<typeof value> => value !== null);
-    if (!candidates.length) {
-      return null;
+    let best: { path: string; extensionWeight: number; depth: number; length: number } | null =
+      null;
+    for (const path of paths) {
+      const name = path.split("/").pop() ?? path;
+      const lower = name.toLowerCase();
+      if (!lower.startsWith("readme")) {
+        continue;
+      }
+      const isExactMd = lower === "readme.md";
+      const isExactMdx = lower === "readme.mdx";
+      const isExact = lower === "readme";
+      const candidate = {
+        path,
+        extensionWeight: isExactMd ? 0 : isExactMdx ? 1 : isExact ? 2 : 3,
+        depth: path.split("/").length,
+        length: path.length,
+      };
+      if (
+        !best ||
+        candidate.extensionWeight < best.extensionWeight ||
+        (candidate.extensionWeight === best.extensionWeight &&
+          (candidate.depth < best.depth ||
+            (candidate.depth === best.depth && candidate.length < best.length)))
+      ) {
+        best = candidate;
+      }
     }
-    candidates.sort((a, b) => {
-      if (a.extensionWeight !== b.extensionWeight) {
-        return a.extensionWeight - b.extensionWeight;
-      }
-      if (a.depth !== b.depth) {
-        return a.depth - b.depth;
-      }
-      return a.length - b.length;
-    });
-    return candidates[0]?.path ?? null;
+    return best?.path ?? null;
   }, []);
 
   const openFile = useCallback(
