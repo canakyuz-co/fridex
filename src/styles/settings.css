@@ -304,6 +304,32 @@
   margin-bottom: 16px;
 }
 
+.settings-shortcuts-tabs {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-muted);
+  margin-bottom: 18px;
+}
+
+.settings-shortcuts-tab {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.settings-shortcuts-tab.active {
+  color: var(--text-strong);
+  background: var(--surface-control);
+  border-color: var(--border-strong);
+}
+
 .settings-subsection-title {
   margin-top: 18px;
   margin-bottom: 6px;

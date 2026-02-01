@@ -113,6 +113,15 @@ const COMPOSER_PRESET_CONFIGS: Record<ComposerPreset, ComposerPresetSettings> = 
   },
 };
 
+const EDITOR_KEYMAP_OPTIONS: Array<{
+  id: AppSettings["editorKeymap"];
+  label: string;
+}> = [
+  { id: "jetbrains", label: "JetBrains (default)" },
+  { id: "vscode", label: "VS Code" },
+  { id: "default", label: "Monaco Default" },
+];
+
 const normalizeOverrideValue = (value: string): string | null => {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
@@ -338,6 +347,7 @@ export function SettingsView({
   initialSection,
 }: SettingsViewProps) {
   const [activeSection, setActiveSection] = useState<CodexSection>("projects");
+  const [activeShortcutsTab, setActiveShortcutsTab] = useState<"chat" | "editor">("chat");
   const [codexPathDraft, setCodexPathDraft] = useState(appSettings.codexBin ?? "");
   const [codexArgsDraft, setCodexArgsDraft] = useState(appSettings.codexArgs ?? "");
   const [remoteHostDraft, setRemoteHostDraft] = useState(appSettings.remoteBackendHost);
@@ -2332,433 +2342,492 @@ export function SettingsView({
                 <div className="settings-section-subtitle">
                   Customize keyboard shortcuts for file actions, composer, panels, and navigation.
                 </div>
-                <div className="settings-subsection-title">File</div>
-                <div className="settings-subsection-subtitle">
-                  Create agents and worktrees from the keyboard.
+                <div className="settings-shortcuts-tabs" role="tablist" aria-label="Shortcut tabs">
+                  <button
+                    type="button"
+                    className={`settings-shortcuts-tab${
+                      activeShortcutsTab === "chat" ? " active" : ""
+                    }`}
+                    role="tab"
+                    aria-selected={activeShortcutsTab === "chat"}
+                    onClick={() => setActiveShortcutsTab("chat")}
+                  >
+                    Chat
+                  </button>
+                  <button
+                    type="button"
+                    className={`settings-shortcuts-tab${
+                      activeShortcutsTab === "editor" ? " active" : ""
+                    }`}
+                    role="tab"
+                    aria-selected={activeShortcutsTab === "editor"}
+                    onClick={() => setActiveShortcutsTab("editor")}
+                  >
+                    Editor
+                  </button>
                 </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">New Agent</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.newAgent)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "newAgentShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("newAgentShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+n")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">New Worktree Agent</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.newWorktreeAgent)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "newWorktreeAgentShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("newWorktreeAgentShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+shift+n")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">New Clone Agent</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.newCloneAgent)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "newCloneAgentShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("newCloneAgentShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+alt+n")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Archive active thread</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.archiveThread)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "archiveThreadShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("archiveThreadShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+ctrl+a")}
-                  </div>
-                </div>
-                <div className="settings-divider" />
-                <div className="settings-subsection-title">Composer</div>
-                <div className="settings-subsection-subtitle">
-                  Cycle between model, access, reasoning, and collaboration modes.
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Cycle model</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.model)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "composerModelShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("composerModelShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Press a new shortcut while focused. Default: {formatShortcut("cmd+shift+m")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Cycle access mode</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.access)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "composerAccessShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("composerAccessShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+shift+a")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Cycle reasoning mode</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.reasoning)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "composerReasoningShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("composerReasoningShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+shift+r")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Cycle collaboration mode</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.collaboration)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "composerCollaborationShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("composerCollaborationShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("shift+tab")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Stop active run</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.interrupt)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "interruptShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("interruptShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut(getDefaultInterruptShortcut())}
-                  </div>
-                </div>
-                <div className="settings-divider" />
-                <div className="settings-subsection-title">Panels</div>
-                <div className="settings-subsection-subtitle">
-                  Toggle sidebars and panels.
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Toggle projects sidebar</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.projectsSidebar)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "toggleProjectsSidebarShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("toggleProjectsSidebarShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+shift+p")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Toggle git sidebar</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.gitSidebar)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "toggleGitSidebarShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("toggleGitSidebarShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+shift+g")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Toggle debug panel</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.debugPanel)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "toggleDebugPanelShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("toggleDebugPanelShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+shift+d")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Toggle terminal panel</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.terminal)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "toggleTerminalShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("toggleTerminalShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+shift+t")}
-                  </div>
-                </div>
-                <div className="settings-divider" />
-                <div className="settings-subsection-title">Navigation</div>
-                <div className="settings-subsection-subtitle">
-                  Cycle between agents and workspaces.
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Next agent</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.cycleAgentNext)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "cycleAgentNextShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("cycleAgentNextShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+ctrl+down")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Previous agent</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.cycleAgentPrev)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "cycleAgentPrevShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("cycleAgentPrevShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+ctrl+up")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Next workspace</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.cycleWorkspaceNext)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "cycleWorkspaceNextShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("cycleWorkspaceNextShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+shift+down")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">Previous workspace</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.cycleWorkspacePrev)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "cycleWorkspacePrevShortcut")
-                      }
-                      placeholder="Type shortcut"
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("cycleWorkspacePrevShortcut", null)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Default: {formatShortcut("cmd+shift+up")}
-                  </div>
-                </div>
+                {activeShortcutsTab === "chat" ? (
+                  <>
+                    <div className="settings-subsection-title">File</div>
+                    <div className="settings-subsection-subtitle">
+                      Create agents and worktrees from the keyboard.
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">New Agent</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.newAgent)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "newAgentShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("newAgentShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+n")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">New Worktree Agent</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.newWorktreeAgent)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "newWorktreeAgentShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("newWorktreeAgentShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+shift+n")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">New Clone Agent</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.newCloneAgent)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "newCloneAgentShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("newCloneAgentShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+alt+n")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Archive active thread</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.archiveThread)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "archiveThreadShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("archiveThreadShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+ctrl+a")}
+                      </div>
+                    </div>
+                    <div className="settings-divider" />
+                    <div className="settings-subsection-title">Composer</div>
+                    <div className="settings-subsection-subtitle">
+                      Cycle between model, access, reasoning, and collaboration modes.
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Cycle model</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.model)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "composerModelShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("composerModelShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Press a new shortcut while focused. Default:{" "}
+                        {formatShortcut("cmd+shift+m")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Cycle access mode</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.access)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "composerAccessShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("composerAccessShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+shift+a")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Cycle reasoning mode</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.reasoning)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "composerReasoningShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("composerReasoningShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+shift+r")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Cycle collaboration mode</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.collaboration)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "composerCollaborationShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("composerCollaborationShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("shift+tab")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Stop active run</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.interrupt)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "interruptShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("interruptShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut(getDefaultInterruptShortcut())}
+                      </div>
+                    </div>
+                    <div className="settings-divider" />
+                    <div className="settings-subsection-title">Panels</div>
+                    <div className="settings-subsection-subtitle">
+                      Toggle sidebars and panels.
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Toggle projects sidebar</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.projectsSidebar)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "toggleProjectsSidebarShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("toggleProjectsSidebarShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+shift+p")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Toggle git sidebar</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.gitSidebar)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "toggleGitSidebarShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("toggleGitSidebarShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+shift+g")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Toggle debug panel</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.debugPanel)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "toggleDebugPanelShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("toggleDebugPanelShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+shift+d")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Toggle terminal panel</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.terminal)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "toggleTerminalShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("toggleTerminalShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+shift+t")}
+                      </div>
+                    </div>
+                    <div className="settings-divider" />
+                    <div className="settings-subsection-title">Navigation</div>
+                    <div className="settings-subsection-subtitle">
+                      Cycle between agents and workspaces.
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Next agent</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.cycleAgentNext)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "cycleAgentNextShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("cycleAgentNextShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+ctrl+down")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Previous agent</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.cycleAgentPrev)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "cycleAgentPrevShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("cycleAgentPrevShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+ctrl+up")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Next workspace</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.cycleWorkspaceNext)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "cycleWorkspaceNextShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("cycleWorkspaceNextShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+shift+down")}
+                      </div>
+                    </div>
+                    <div className="settings-field">
+                      <div className="settings-field-label">Previous workspace</div>
+                      <div className="settings-field-row">
+                        <input
+                          className="settings-input settings-input--shortcut"
+                          value={formatShortcut(shortcutDrafts.cycleWorkspacePrev)}
+                          onKeyDown={(event) =>
+                            handleShortcutKeyDown(event, "cycleWorkspacePrevShortcut")
+                          }
+                          placeholder="Type shortcut"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ghost settings-button-compact"
+                          onClick={() => void updateShortcut("cycleWorkspacePrevShortcut", null)}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="settings-help">
+                        Default: {formatShortcut("cmd+shift+up")}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="settings-subsection-title">Editor</div>
+                    <div className="settings-subsection-subtitle">
+                      Choose the keymap used inside the code editor.
+                    </div>
+                    <div className="settings-field">
+                      <label className="settings-field-label" htmlFor="editor-keymap">
+                        Keymap
+                      </label>
+                      <select
+                        id="editor-keymap"
+                        className="settings-select"
+                        value={appSettings.editorKeymap}
+                        onChange={(event) =>
+                          void onUpdateAppSettings({
+                            ...appSettings,
+                            editorKeymap: event.target.value as AppSettings["editorKeymap"],
+                          })
+                        }
+                      >
+                        {EDITOR_KEYMAP_OPTIONS.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="settings-help">Default: JetBrains</div>
+                    </div>
+                  </>
+                )}
               </section>
             )}
             {activeSection === "open-apps" && (

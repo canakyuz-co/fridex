@@ -127,6 +127,8 @@ export type OpenAppTarget = {
   args: string[];
 };
 
+export type EditorKeymap = "jetbrains" | "vscode" | "default";
+
 export type AppSettings = {
   codexBin: string | null;
   codexArgs: string | null;
@@ -152,6 +154,7 @@ export type AppSettings = {
   cycleAgentPrevShortcut: string | null;
   cycleWorkspaceNextShortcut: string | null;
   cycleWorkspacePrevShortcut: string | null;
+  editorKeymap: EditorKeymap;
   lastComposerModelId: string | null;
   lastComposerReasoningEffort: string | null;
   uiScale: number;

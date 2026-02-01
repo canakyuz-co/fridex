@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { readWorkspaceFile, writeWorkspaceFile } from "../../../services/tauri";
 import { monacoLanguageFromPath } from "../../../utils/languageRegistry";
 
@@ -15,6 +15,8 @@ type EditorBuffer = {
 
 type UseEditorStateOptions = {
   workspaceId: string | null;
+  availablePaths?: string[];
+  filesReady?: boolean;
   onDidSave?: (path: string) => void;
 };
 
@@ -32,17 +34,53 @@ type UseEditorStateResult = {
 
 export function useEditorState({
   workspaceId,
+  availablePaths = [],
+  filesReady = true,
   onDidSave,
 }: UseEditorStateOptions): UseEditorStateResult {
   const [openPaths, setOpenPaths] = useState<string[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
   const [buffersByPath, setBuffersByPath] = useState<Record<string, EditorBuffer>>({});
+  const hasRestoredRef = useRef(false);
 
-  useEffect(() => {
-    setOpenPaths([]);
-    setActivePath(null);
-    setBuffersByPath({});
-  }, [workspaceId]);
+  const getLastFileKey = useCallback(
+    (id: string) => `codexmonitor.editorLastFile.${id}`,
+    [],
+  );
+
+  const findReadmePath = useCallback((paths: string[]) => {
+    if (!paths.length) {
+      return null;
+    }
+    const candidates = paths
+      .map((path) => {
+        const name = path.split("/").pop() ?? path;
+        const lower = name.toLowerCase();
+        if (!lower.startsWith("readme")) {
+          return null;
+        }
+        const isExactMd = lower === "readme.md";
+        const isExactMdx = lower === "readme.mdx";
+        const isExact = lower === "readme";
+        const extensionWeight = isExactMd ? 0 : isExactMdx ? 1 : isExact ? 2 : 3;
+        const depth = path.split("/").length;
+        return { path, extensionWeight, depth, length: path.length };
+      })
+      .filter((value): value is NonNullable<typeof value> => value !== null);
+    if (!candidates.length) {
+      return null;
+    }
+    candidates.sort((a, b) => {
+      if (a.extensionWeight !== b.extensionWeight) {
+        return a.extensionWeight - b.extensionWeight;
+      }
+      if (a.depth !== b.depth) {
+        return a.depth - b.depth;
+      }
+      return a.length - b.length;
+    });
+    return candidates[0]?.path ?? null;
+  }, []);
 
   const openFile = useCallback(
     (path: string) => {
@@ -109,6 +147,53 @@ export function useEditorState({
     },
     [workspaceId],
   );
+
+  useEffect(() => {
+    setOpenPaths([]);
+    setActivePath(null);
+    setBuffersByPath({});
+    hasRestoredRef.current = false;
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (!workspaceId || !filesReady) {
+      return;
+    }
+    if (hasRestoredRef.current) {
+      return;
+    }
+    if (openPaths.length > 0 || activePath) {
+      hasRestoredRef.current = true;
+      return;
+    }
+    const storedPath =
+      typeof window === "undefined"
+        ? null
+        : window.localStorage.getItem(getLastFileKey(workspaceId));
+    const storedIsValid = storedPath ? availablePaths.includes(storedPath) : false;
+    const readmePath = storedIsValid ? null : findReadmePath(availablePaths);
+    const nextPath = storedIsValid ? storedPath : readmePath;
+    hasRestoredRef.current = true;
+    if (nextPath) {
+      openFile(nextPath);
+    }
+  }, [
+    activePath,
+    availablePaths,
+    filesReady,
+    findReadmePath,
+    getLastFileKey,
+    openFile,
+    openPaths.length,
+    workspaceId,
+  ]);
+
+  useEffect(() => {
+    if (!workspaceId || !activePath || typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.setItem(getLastFileKey(workspaceId), activePath);
+  }, [activePath, getLastFileKey, workspaceId]);
 
   const closeFile = useCallback((path: string) => {
     setOpenPaths((prev) => {

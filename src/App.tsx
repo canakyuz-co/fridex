@@ -526,6 +526,8 @@ function MainApp() {
   const editorDidSaveRef = useRef<(path: string) => void>(() => {});
   const editorState = useEditorState({
     workspaceId: activeWorkspaceId,
+    availablePaths: files,
+    filesReady: Boolean(activeWorkspaceId) && !isFilesLoading,
     onDidSave: (path) => editorDidSaveRef.current(path),
   });
   const editorLsp = useEditorLsp({

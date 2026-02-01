@@ -426,6 +426,8 @@ pub(crate) struct AppSettings {
         rename = "cycleWorkspacePrevShortcut"
     )]
     pub(crate) cycle_workspace_prev_shortcut: Option<String>,
+    #[serde(default = "default_editor_keymap", rename = "editorKeymap")]
+    pub(crate) editor_keymap: String,
     #[serde(default, rename = "lastComposerModelId")]
     pub(crate) last_composer_model_id: Option<String>,
     #[serde(default, rename = "lastComposerReasoningEffort")]
@@ -545,6 +547,10 @@ fn default_theme() -> String {
 
 fn default_usage_show_remaining() -> bool {
     false
+}
+
+fn default_editor_keymap() -> String {
+    "jetbrains".to_string()
 }
 
 fn default_ui_font_family() -> String {
@@ -867,6 +873,7 @@ impl Default for AppSettings {
             cycle_agent_prev_shortcut: default_cycle_agent_prev_shortcut(),
             cycle_workspace_next_shortcut: default_cycle_workspace_next_shortcut(),
             cycle_workspace_prev_shortcut: default_cycle_workspace_prev_shortcut(),
+            editor_keymap: default_editor_keymap(),
             last_composer_model_id: None,
             last_composer_reasoning_effort: None,
             ui_scale: 1.0,
@@ -969,6 +976,7 @@ mod tests {
             settings.cycle_workspace_prev_shortcut.as_deref(),
             Some("cmd+shift+up")
         );
+        assert_eq!(settings.editor_keymap, "jetbrains");
         assert!(settings.last_composer_model_id.is_none());
         assert!(settings.last_composer_reasoning_effort.is_none());
         assert!((settings.ui_scale - 1.0).abs() < f64::EPSILON);

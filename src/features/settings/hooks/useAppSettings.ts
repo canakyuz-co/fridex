@@ -19,6 +19,7 @@ import { normalizeOpenAppTargets } from "../../app/utils/openApp";
 import { getDefaultInterruptShortcut } from "../../../utils/shortcuts";
 
 const allowedThemes = new Set(["system", "light", "dark", "dim"]);
+const allowedEditorKeymaps = new Set(["jetbrains", "vscode", "default"]);
 const LEGACY_UI_FONT_FAMILY =
   "\"SF Pro Text\", \"SF Pro Display\", -apple-system, \"Helvetica Neue\", sans-serif";
 const LEGACY_CODE_FONT_FAMILY =
@@ -72,6 +73,7 @@ const defaultSettings: AppSettings = {
   cycleAgentPrevShortcut: "cmd+ctrl+up",
   cycleWorkspaceNextShortcut: "cmd+shift+down",
   cycleWorkspacePrevShortcut: "cmd+shift+up",
+  editorKeymap: "jetbrains",
   lastComposerModelId: null,
   lastComposerReasoningEffort: null,
   uiScale: UI_SCALE_DEFAULT,
@@ -169,6 +171,9 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
       [LEGACY_CODE_FONT_FAMILY],
     ),
     codeFontSize: clampCodeFontSize(settings.codeFontSize),
+    editorKeymap: allowedEditorKeymaps.has(settings.editorKeymap)
+      ? settings.editorKeymap
+      : "jetbrains",
     otherAiProviders: normalizedOtherAiProviders,
     openAppTargets: normalizedTargets,
     selectedOpenAppId,
