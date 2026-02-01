@@ -87,6 +87,7 @@ pub async fn send_claude_cli_message(
 
     // Add default args for stream-json output
     cmd.arg("--print");
+    cmd.arg("--verbose");
     cmd.arg("--output-format");
     cmd.arg("stream-json");
 
