@@ -33,6 +33,19 @@ export function useCollaborationModes({
     [modes, selectedModeId],
   );
 
+  const buildFallbackModes = useCallback((): CollaborationModeOption[] => {
+    const defaultModes = ["code", "plan"];
+    return defaultModes.map((mode) => ({
+      id: mode,
+      label: formatCollaborationModeLabel(mode),
+      mode,
+      model: "",
+      reasoningEffort: null,
+      developerInstructions: null,
+      value: { mode },
+    }));
+  }, []);
+
   const refreshModes = useCallback(async () => {
     if (!workspaceId || !isConnected || !enabled) {
       return;
@@ -109,18 +122,19 @@ export function useCollaborationModes({
           };
         })
         .filter(Boolean);
-      setModes(data);
+      const nextModes = data.length > 0 ? data : buildFallbackModes();
+      setModes(nextModes);
       lastFetchedWorkspaceId.current = workspaceId;
       const preferredModeId =
-        data.find((mode) => mode.mode === "code" || mode.id === "code")?.id ??
-        data[0]?.id ??
+        nextModes.find((mode) => mode.mode === "code" || mode.id === "code")?.id ??
+        nextModes[0]?.id ??
         null;
       setSelectedModeId((currentSelection) => {
         const selection = currentSelection ?? selectedModeIdRef.current;
         if (!selection) {
           return preferredModeId;
         }
-        if (!data.some((mode) => mode.id === selection)) {
+        if (!nextModes.some((mode) => mode.id === selection)) {
           return preferredModeId;
         }
         return selection;
@@ -133,10 +147,16 @@ export function useCollaborationModes({
         label: "collaborationMode/list error",
         payload: error instanceof Error ? error.message : String(error),
       });
+      const fallbackModes = buildFallbackModes();
+      setModes(fallbackModes);
+      lastFetchedWorkspaceId.current = workspaceId;
+      const preferredModeId =
+        fallbackModes.find((mode) => mode.mode === "code")?.id ?? "code";
+      setSelectedModeId((currentSelection) => currentSelection ?? preferredModeId);
     } finally {
       inFlight.current = false;
     }
-  }, [enabled, isConnected, onDebug, workspaceId]);
+  }, [buildFallbackModes, enabled, isConnected, onDebug, workspaceId]);
 
   useEffect(() => {
     selectedModeIdRef.current = selectedModeId;
