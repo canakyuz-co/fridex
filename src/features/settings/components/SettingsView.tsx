@@ -34,8 +34,10 @@ import { clampUiScale } from "../../../utils/uiScale";
 import { getCodexConfigPath, listOtherAiModels } from "../../../services/tauri";
 import { pushErrorToast } from "../../../services/toasts";
 import {
+  CODE_FONT_FAMILY_OPTIONS,
   DEFAULT_CODE_FONT_FAMILY,
   DEFAULT_UI_FONT_FAMILY,
+  UI_FONT_FAMILY_OPTIONS,
   CODE_FONT_SIZE_DEFAULT,
   CODE_FONT_SIZE_MAX,
   CODE_FONT_SIZE_MIN,
@@ -1635,6 +1637,7 @@ export function SettingsView({
                       id="ui-font-family"
                       type="text"
                       className="settings-input"
+                      list="ui-font-family-options"
                       value={uiFontDraft}
                       onChange={(event) => setUiFontDraft(event.target.value)}
                       onBlur={() => {
@@ -1661,6 +1664,11 @@ export function SettingsView({
                       Reset
                     </button>
                   </div>
+                  <datalist id="ui-font-family-options">
+                    {UI_FONT_FAMILY_OPTIONS.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
                   <div className="settings-help">
                     Applies to all UI text. Leave empty to use the default system font stack.
                   </div>
@@ -1674,6 +1682,7 @@ export function SettingsView({
                       id="code-font-family"
                       type="text"
                       className="settings-input"
+                      list="code-font-family-options"
                       value={codeFontDraft}
                       onChange={(event) => setCodeFontDraft(event.target.value)}
                       onBlur={() => {
@@ -1700,6 +1709,11 @@ export function SettingsView({
                       Reset
                     </button>
                   </div>
+                  <datalist id="code-font-family-options">
+                    {CODE_FONT_FAMILY_OPTIONS.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
                   <div className="settings-help">
                     Applies to git diffs and other mono-spaced readouts.
                   </div>
