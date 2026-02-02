@@ -133,6 +133,7 @@ export function EditorView({
   buffersByPath,
   availablePaths,
   editorKeymap,
+  workspacePath,
   launchScript,
   launchScripts,
   onSelectPath,
@@ -159,8 +160,8 @@ export function EditorView({
   const [workspaceSearchOpen, setWorkspaceSearchOpen] = useState(false);
   const [workspaceSearchTab, setWorkspaceSearchTab] = useState<WorkspaceSearchTab>("all");
   const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState("");
-  const [workspaceSearchInclude, setWorkspaceSearchInclude] = useState("");
-  const [workspaceSearchExclude, setWorkspaceSearchExclude] = useState(
+  const [workspaceSearchInclude, _setWorkspaceSearchInclude] = useState("");
+  const [workspaceSearchExclude, _setWorkspaceSearchExclude] = useState(
     "node_modules/**, dist/**, .git/**",
   );
   const [workspaceSearchResults, setWorkspaceSearchResults] = useState<
@@ -870,8 +871,6 @@ export function EditorView({
         activeTab={workspaceSearchTab}
         onTabChange={setWorkspaceSearchTab}
         query={workspaceSearchQuery}
-        includeGlobs={workspaceSearchInclude}
-        excludeGlobs={workspaceSearchExclude}
         results={workspaceSearchResults}
         fileResults={workspaceSearchFileResults}
         classResults={workspaceClassResults}
@@ -883,8 +882,6 @@ export function EditorView({
         error={workspaceSearchError}
         onClose={closeWorkspaceSearch}
         onQueryChange={setWorkspaceSearchQuery}
-        onIncludeChange={setWorkspaceSearchInclude}
-        onExcludeChange={setWorkspaceSearchExclude}
         onSelectResult={(result) => {
           pendingRevealRef.current = {
             path: result.path,

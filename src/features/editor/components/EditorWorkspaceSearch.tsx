@@ -15,6 +15,14 @@ type WorkspaceSearchResult = {
   matchText?: string | null;
 };
 
+type WorkspaceSymbolResult = {
+  name: string;
+  kind: "class" | "symbol";
+  line: number;
+  column: number;
+  detail?: string | null;
+};
+
 type WorkspaceSearchTab =
   | "all"
   | "files"
@@ -35,8 +43,6 @@ type EditorWorkspaceSearchProps = {
   activeTab: WorkspaceSearchTab;
   onTabChange: (tab: WorkspaceSearchTab) => void;
   query: string;
-  includeGlobs: string;
-  excludeGlobs: string;
   results: WorkspaceSearchResult[];
   fileResults: string[];
   classResults: WorkspaceSymbolResult[];
@@ -48,8 +54,6 @@ type EditorWorkspaceSearchProps = {
   error: string | null;
   onClose: () => void;
   onQueryChange: (value: string) => void;
-  onIncludeChange: (value: string) => void;
-  onExcludeChange: (value: string) => void;
   onSelectResult: (result: WorkspaceSearchResult) => void;
   onSelectFile: (path: string) => void;
   onSelectAction: (action: WorkspaceSearchAction) => void;
@@ -82,8 +86,6 @@ export function EditorWorkspaceSearch({
   activeTab,
   onTabChange,
   query,
-  includeGlobs,
-  excludeGlobs,
   results,
   fileResults,
   classResults,
@@ -95,8 +97,6 @@ export function EditorWorkspaceSearch({
   error,
   onClose,
   onQueryChange,
-  onIncludeChange,
-  onExcludeChange,
   onSelectResult,
   onSelectFile,
   onSelectAction,
@@ -158,8 +158,6 @@ export function EditorWorkspaceSearch({
   if (!isOpen) {
     return null;
   }
-
-  const showTextControls = activeTab === "text" || activeTab === "all";
 
   return (
     <div className="editor-workspace-search" role="dialog" aria-modal="true">
