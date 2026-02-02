@@ -146,6 +146,15 @@ struct WorkspaceFileResponse {
     truncated: bool,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+struct WorkspaceSearchResult {
+    path: String,
+    line: u32,
+    column: u32,
+    line_text: String,
+    match_text: Option<String>,
+}
+
 impl DaemonState {
     fn load(config: &DaemonConfig, event_sink: DaemonEventSink) -> Self {
         let storage_path = config.data_dir.join("workspaces.json");
@@ -468,6 +477,28 @@ impl DaemonState {
         .await
     }
 
+    async fn search_workspace_files(
+        &self,
+        workspace_id: String,
+        query: String,
+        include_globs: Vec<String>,
+        exclude_globs: Vec<String>,
+        max_results: u32,
+    ) -> Result<Vec<WorkspaceSearchResult>, String> {
+        workspaces_core::search_workspace_files_core(
+            &self.workspaces,
+            &workspace_id,
+            &query,
+            &include_globs,
+            &exclude_globs,
+            max_results as usize,
+            |root, query, include_globs, exclude_globs, max_results| {
+                search_workspace_files_inner(root, query, include_globs, exclude_globs, max_results)
+            },
+        )
+        .await
+    }
+
     async fn read_workspace_file(
         &self,
         workspace_id: String,
@@ -738,6 +769,112 @@ fn list_workspace_files_inner(root: &PathBuf, max_files: usize) -> Vec<String> {
 
     results.sort();
     results
+}
+
+fn search_workspace_files_inner(
+    root: &PathBuf,
+    query: &str,
+    include_globs: &[String],
+    exclude_globs: &[String],
+    max_results: usize,
+) -> Result<Vec<WorkspaceSearchResult>, String> {
+    let mut cmd = std::process::Command::new("rg");
+    cmd.current_dir(root);
+    cmd.arg("--json")
+        .arg("--with-filename")
+        .arg("--line-number")
+        .arg("--column")
+        .arg("--color")
+        .arg("never");
+    for pattern in include_globs {
+        if !pattern.trim().is_empty() {
+            cmd.arg("--glob").arg(pattern);
+        }
+    }
+    for pattern in exclude_globs {
+        let trimmed = pattern.trim();
+        if !trimmed.is_empty() {
+            cmd.arg("--glob").arg(format!("!{trimmed}"));
+        }
+    }
+    cmd.arg(query);
+    let output = cmd
+        .output()
+        .map_err(|err| format!("Failed to run rg: {err}"))?;
+
+    if !output.status.success() && output.status.code() != Some(1) {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Search failed: {stderr}"));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut results = Vec::new();
+    for line in stdout.lines() {
+        if results.len() >= max_results {
+            break;
+        }
+        let Ok(value) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        let Some(kind) = value.get("type").and_then(|value| value.as_str()) else {
+            continue;
+        };
+        if kind != "match" {
+            continue;
+        }
+        let data = match value.get("data") {
+            Some(data) => data,
+            None => continue,
+        };
+        let path = data
+            .get("path")
+            .and_then(|path| path.get("text"))
+            .and_then(|value| value.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let line_number = data
+            .get("line_number")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0) as u32;
+        let line_text = data
+            .get("lines")
+            .and_then(|lines| lines.get("text"))
+            .and_then(|value| value.as_str())
+            .unwrap_or_default()
+            .trim_end_matches(['\n', '\r'])
+            .to_string();
+        let (column, match_text) = data
+            .get("submatches")
+            .and_then(|value| value.as_array())
+            .and_then(|matches| matches.first())
+            .and_then(|match_value| {
+                let start = match_value.get("start")?.as_u64()?;
+                let end = match_value.get("end")?.as_u64()?;
+                Some((start, end))
+            })
+            .map(|(start, end)| {
+                let bytes = line_text.as_bytes();
+                let start_index = std::cmp::min(start as usize, bytes.len());
+                let end_index = std::cmp::min(end as usize, bytes.len());
+                let match_text = if start_index < end_index {
+                    String::from_utf8_lossy(&bytes[start_index..end_index]).to_string()
+                } else {
+                    String::new()
+                };
+                ((start_index as u32) + 1, Some(match_text))
+            })
+            .unwrap_or((1, None));
+
+        results.push(WorkspaceSearchResult {
+            path,
+            line: line_number.max(1),
+            column,
+            line_text,
+            match_text,
+        });
+    }
+
+    Ok(results)
 }
 
 const MAX_WORKSPACE_FILE_BYTES: u64 = 400_000;
@@ -1368,6 +1505,25 @@ async fn handle_rpc_request(
             let workspace_id = parse_string(&params, "workspaceId")?;
             let files = state.list_workspace_files(workspace_id).await?;
             serde_json::to_value(files).map_err(|err| err.to_string())
+        }
+        "search_workspace_files" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let query = parse_string(&params, "query")?;
+            let include_globs = parse_optional_string_array(&params, "includeGlobs")
+                .unwrap_or_default();
+            let exclude_globs = parse_optional_string_array(&params, "excludeGlobs")
+                .unwrap_or_default();
+            let max_results = parse_optional_u32(&params, "maxResults").unwrap_or(200);
+            let results = state
+                .search_workspace_files(
+                    workspace_id,
+                    query,
+                    include_globs,
+                    exclude_globs,
+                    max_results,
+                )
+                .await?;
+            serde_json::to_value(results).map_err(|err| err.to_string())
         }
         "read_workspace_file" => {
             let workspace_id = parse_string(&params, "workspaceId")?;

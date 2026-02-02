@@ -587,6 +587,30 @@ export async function getWorkspaceFiles(workspaceId: string) {
   return invoke<string[]>("list_workspace_files", { workspaceId });
 }
 
+export type WorkspaceSearchResult = {
+  path: string;
+  line: number;
+  column: number;
+  lineText: string;
+  matchText?: string | null;
+};
+
+export async function searchWorkspaceFiles(
+  workspaceId: string,
+  query: string,
+  includeGlobs: string[],
+  excludeGlobs: string[],
+  maxResults: number,
+): Promise<WorkspaceSearchResult[]> {
+  return invoke<WorkspaceSearchResult[]>("search_workspace_files", {
+    workspaceId,
+    query,
+    includeGlobs,
+    excludeGlobs,
+    maxResults,
+  });
+}
+
 export async function readWorkspaceFile(
   workspaceId: string,
   path: string,

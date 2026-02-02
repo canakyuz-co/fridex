@@ -9,7 +9,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorPlaceholder } from "./EditorPlaceholder";
 import { Markdown } from "../../messages/components/Markdown";
 import { EditorCommandPalette } from "./EditorCommandPalette";
+import { EditorWorkspaceSearch } from "./EditorWorkspaceSearch";
 import type { EditorKeymap, LaunchScriptEntry } from "../../../types";
+import { searchWorkspaceFiles } from "../../../services/tauri";
 
 import "monaco-editor/esm/vs/language/css/monaco.contribution";
 import "monaco-editor/esm/vs/language/html/monaco.contribution";
@@ -34,6 +36,14 @@ type EditorBuffer = {
   isLoading: boolean;
   error: string | null;
   isTruncated: boolean;
+};
+
+type WorkspaceSearchResult = {
+  path: string;
+  line: number;
+  column: number;
+  lineText: string;
+  matchText?: string | null;
 };
 
 type EditorViewProps = {
@@ -121,7 +131,21 @@ export function EditorView({
   const monacoRef = useRef<Monaco | null>(null);
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [workspaceSearchOpen, setWorkspaceSearchOpen] = useState(false);
+  const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState("");
+  const [workspaceSearchInclude, setWorkspaceSearchInclude] = useState("");
+  const [workspaceSearchExclude, setWorkspaceSearchExclude] = useState(
+    "node_modules/**, dist/**, .git/**",
+  );
+  const [workspaceSearchResults, setWorkspaceSearchResults] = useState<
+    WorkspaceSearchResult[]
+  >([]);
+  const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
+  const [workspaceSearchError, setWorkspaceSearchError] = useState<string | null>(null);
   const shiftTapRef = useRef(0);
+  const pendingRevealRef = useRef<{ path: string; line: number; column: number } | null>(
+    null,
+  );
 
   const openCommandPalette = useCallback(() => {
     setCommandPaletteOpen(true);
@@ -131,9 +155,25 @@ export function EditorView({
     setCommandPaletteOpen(false);
   }, []);
 
+  const openWorkspaceSearch = useCallback(() => {
+    setWorkspaceSearchOpen(true);
+    setCommandPaletteOpen(false);
+  }, []);
+
+  const closeWorkspaceSearch = useCallback(() => {
+    setWorkspaceSearchOpen(false);
+  }, []);
+
   useEffect(() => {
     activePathRef.current = activePath;
   }, [activePath]);
+
+  useEffect(() => {
+    setWorkspaceSearchOpen(false);
+    setWorkspaceSearchQuery("");
+    setWorkspaceSearchResults([]);
+    setWorkspaceSearchError(null);
+  }, [workspaceId]);
 
   const tabs = useMemo(
     () =>
@@ -286,6 +326,70 @@ export function EditorView({
     }
     setMarkdownView(isMarkdown ? "split" : "code");
   }, [activeBufferPath, isMarkdown]);
+
+  useEffect(() => {
+    const pending = pendingRevealRef.current;
+    if (!pending || pending.path !== activeBufferPath || !editorRef.current) {
+      return;
+    }
+    editorRef.current.revealLineInCenter(pending.line);
+    editorRef.current.setPosition({
+      lineNumber: pending.line,
+      column: pending.column,
+    });
+    editorRef.current.focus();
+    pendingRevealRef.current = null;
+  }, [activeBufferPath, activeBuffer?.content]);
+
+  useEffect(() => {
+    if (!workspaceSearchOpen || !workspaceId) {
+      return;
+    }
+    const trimmed = workspaceSearchQuery.trim();
+    if (!trimmed) {
+      setWorkspaceSearchResults([]);
+      setWorkspaceSearchError(null);
+      return;
+    }
+    const includeGlobs = workspaceSearchInclude
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    const excludeGlobs = workspaceSearchExclude
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    const handle = window.setTimeout(() => {
+      setWorkspaceSearchLoading(true);
+      searchWorkspaceFiles(
+        workspaceId,
+        trimmed,
+        includeGlobs,
+        excludeGlobs,
+        200,
+      )
+        .then((results) => {
+          setWorkspaceSearchResults(results);
+          setWorkspaceSearchError(null);
+        })
+        .catch((error) => {
+          setWorkspaceSearchResults([]);
+          setWorkspaceSearchError(
+            error instanceof Error ? error.message : String(error),
+          );
+        })
+        .finally(() => {
+          setWorkspaceSearchLoading(false);
+        });
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [
+    workspaceId,
+    workspaceSearchExclude,
+    workspaceSearchInclude,
+    workspaceSearchOpen,
+    workspaceSearchQuery,
+  ]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
@@ -495,6 +599,7 @@ export function EditorView({
         isOpen={commandPaletteOpen}
         onClose={closeCommandPalette}
         editorKeymap={editorKeymap}
+        onOpenWorkspaceSearch={openWorkspaceSearch}
         availablePaths={availablePaths}
         openPaths={openPaths}
         onOpenPath={onOpenPath}
@@ -504,6 +609,28 @@ export function EditorView({
         launchScripts={launchScripts}
         onRunLaunchScript={onRunLaunchScript}
         onRunLaunchScriptEntry={onRunLaunchScriptEntry}
+      />
+      <EditorWorkspaceSearch
+        isOpen={workspaceSearchOpen}
+        query={workspaceSearchQuery}
+        includeGlobs={workspaceSearchInclude}
+        excludeGlobs={workspaceSearchExclude}
+        results={workspaceSearchResults}
+        isLoading={workspaceSearchLoading}
+        error={workspaceSearchError}
+        onClose={closeWorkspaceSearch}
+        onQueryChange={setWorkspaceSearchQuery}
+        onIncludeChange={setWorkspaceSearchInclude}
+        onExcludeChange={setWorkspaceSearchExclude}
+        onSelectResult={(result) => {
+          pendingRevealRef.current = {
+            path: result.path,
+            line: result.line,
+            column: result.column,
+          };
+          onOpenPath(result.path);
+          closeWorkspaceSearch();
+        }}
       />
     </div>
   );

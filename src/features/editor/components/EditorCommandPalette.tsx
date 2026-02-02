@@ -19,6 +19,7 @@ type EditorCommandPaletteProps = {
   isOpen: boolean;
   onClose: () => void;
   editorKeymap: EditorKeymap;
+  onOpenWorkspaceSearch: () => void;
   availablePaths: string[];
   openPaths: string[];
   onOpenPath: (path: string) => void;
@@ -47,6 +48,7 @@ export function EditorCommandPalette({
   isOpen,
   onClose,
   editorKeymap,
+  onOpenWorkspaceSearch,
   availablePaths,
   openPaths,
   onOpenPath,
@@ -63,6 +65,14 @@ export function EditorCommandPalette({
 
   const actionItems = useMemo<PaletteItem[]>(() => {
     const items: PaletteItem[] = [
+      {
+        id: "workspace-search",
+        label: "Search in workspace",
+        detail: "Find matches across the project",
+        kind: "action",
+        icon: <Search size={16} aria-hidden />,
+        onSelect: onOpenWorkspaceSearch,
+      },
       {
         id: "find",
         label: "Find in file",
@@ -136,7 +146,15 @@ export function EditorCommandPalette({
     }
 
     return items;
-  }, [launchScript, launchScripts, onOpenFind, onOpenReplace, onRunLaunchScript, onRunLaunchScriptEntry]);
+  }, [
+    launchScript,
+    launchScripts,
+    onOpenFind,
+    onOpenReplace,
+    onOpenWorkspaceSearch,
+    onRunLaunchScript,
+    onRunLaunchScriptEntry,
+  ]);
 
   const filteredActionItems = useMemo(() => {
     const normalized = normalizeQuery(query);

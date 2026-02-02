@@ -1100,6 +1100,22 @@ where
     read_file(&root, path)
 }
 
+pub(crate) async fn search_workspace_files_core<F, T>(
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+    workspace_id: &str,
+    query: &str,
+    include_globs: &[String],
+    exclude_globs: &[String],
+    max_results: usize,
+    search_files: F,
+) -> Result<T, String>
+where
+    F: Fn(&PathBuf, &str, &[String], &[String], usize) -> Result<T, String>,
+{
+    let root = resolve_workspace_root(workspaces, workspace_id).await?;
+    search_files(&root, query, include_globs, exclude_globs, max_results)
+}
+
 fn sort_workspaces(workspaces: &mut [WorkspaceInfo]) {
     workspaces.sort_by(|a, b| {
         let a_order = a.settings.sort_order.unwrap_or(u32::MAX);

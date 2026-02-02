@@ -27,6 +27,7 @@ import "./styles/clone-modal.css";
 import "./styles/settings.css";
 import "./styles/editor.css";
 import "./styles/editor-command-palette.css";
+import "./styles/editor-workspace-search.css";
 import "./styles/compact-base.css";
 import "./styles/compact-phone.css";
 import "./styles/compact-tablet.css";

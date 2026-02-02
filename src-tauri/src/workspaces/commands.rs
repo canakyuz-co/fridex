@@ -11,8 +11,8 @@ use uuid::Uuid;
 #[cfg(target_os = "macos")]
 use super::macos::get_open_app_icon_inner;
 use super::files::{
-    list_workspace_files_inner, read_workspace_file_inner, write_workspace_file_inner,
-    WorkspaceFileResponse,
+    list_workspace_files_inner, read_workspace_file_inner, search_workspace_files_inner,
+    write_workspace_file_inner, WorkspaceFileResponse, WorkspaceSearchResult,
 };
 use super::git::{
     git_branch_exists, git_find_remote_for_branch, git_get_origin_url, git_remote_branch_exists,
@@ -115,6 +115,47 @@ pub(crate) async fn list_workspaces(
     }
 
     Ok(workspaces_core::list_workspaces_core(&state.workspaces, &state.sessions).await)
+}
+
+#[tauri::command]
+pub(crate) async fn search_workspace_files(
+    workspace_id: String,
+    query: String,
+    include_globs: Vec<String>,
+    exclude_globs: Vec<String>,
+    max_results: u32,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Vec<WorkspaceSearchResult>, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        let response = remote_backend::call_remote(
+            &*state,
+            app,
+            "search_workspace_files",
+            json!({
+                "workspaceId": workspace_id,
+                "query": query,
+                "includeGlobs": include_globs,
+                "excludeGlobs": exclude_globs,
+                "maxResults": max_results,
+            }),
+        )
+        .await?;
+        return serde_json::from_value(response).map_err(|err| err.to_string());
+    }
+
+    workspaces_core::search_workspace_files_core(
+        &state.workspaces,
+        &workspace_id,
+        &query,
+        &include_globs,
+        &exclude_globs,
+        max_results as usize,
+        |root, query, include_globs, exclude_globs, max_results| {
+            search_workspace_files_inner(root, query, include_globs, exclude_globs, max_results)
+        },
+    )
+    .await
 }
 
 
