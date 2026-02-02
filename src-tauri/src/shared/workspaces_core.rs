@@ -1116,6 +1116,59 @@ where
     search_files(&root, query, include_globs, exclude_globs, max_results)
 }
 
+pub(crate) async fn create_workspace_file_core<F>(
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+    workspace_id: &str,
+    path: &str,
+    create_file: F,
+) -> Result<(), String>
+where
+    F: Fn(&PathBuf, &str) -> Result<(), String>,
+{
+    let root = resolve_workspace_root(workspaces, workspace_id).await?;
+    create_file(&root, path)
+}
+
+pub(crate) async fn create_workspace_dir_core<F>(
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+    workspace_id: &str,
+    path: &str,
+    create_dir: F,
+) -> Result<(), String>
+where
+    F: Fn(&PathBuf, &str) -> Result<(), String>,
+{
+    let root = resolve_workspace_root(workspaces, workspace_id).await?;
+    create_dir(&root, path)
+}
+
+pub(crate) async fn delete_workspace_path_core<F>(
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+    workspace_id: &str,
+    path: &str,
+    delete_path: F,
+) -> Result<(), String>
+where
+    F: Fn(&PathBuf, &str) -> Result<(), String>,
+{
+    let root = resolve_workspace_root(workspaces, workspace_id).await?;
+    delete_path(&root, path)
+}
+
+pub(crate) async fn move_workspace_path_core<F>(
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+    workspace_id: &str,
+    from_path: &str,
+    to_path: &str,
+    move_path: F,
+) -> Result<(), String>
+where
+    F: Fn(&PathBuf, &str, &str) -> Result<(), String>,
+{
+    let root = resolve_workspace_root(workspaces, workspace_id).await?;
+    move_path(&root, from_path, to_path)
+}
+
 fn sort_workspaces(workspaces: &mut [WorkspaceInfo]) {
     workspaces.sort_by(|a, b| {
         let a_order = a.settings.sort_order.unwrap_or(u32::MAX);

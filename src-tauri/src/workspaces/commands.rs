@@ -11,8 +11,10 @@ use uuid::Uuid;
 #[cfg(target_os = "macos")]
 use super::macos::get_open_app_icon_inner;
 use super::files::{
-    list_workspace_files_inner, read_workspace_file_inner, search_workspace_files_inner,
-    write_workspace_file_inner, WorkspaceFileResponse, WorkspaceSearchResult,
+    create_workspace_dir_inner, create_workspace_file_inner, delete_workspace_path_inner,
+    list_workspace_files_inner, move_workspace_path_inner, read_workspace_file_inner,
+    search_workspace_files_inner, write_workspace_file_inner, WorkspaceFileResponse,
+    WorkspaceSearchResult,
 };
 use super::git::{
     git_branch_exists, git_find_remote_for_branch, git_get_origin_url, git_remote_branch_exists,
@@ -154,6 +156,116 @@ pub(crate) async fn search_workspace_files(
         |root, query, include_globs, exclude_globs, max_results| {
             search_workspace_files_inner(root, query, include_globs, exclude_globs, max_results)
         },
+    )
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn create_workspace_file(
+    workspace_id: String,
+    path: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        remote_backend::call_remote(
+            &*state,
+            app,
+            "create_workspace_file",
+            json!({ "workspaceId": workspace_id, "path": path }),
+        )
+        .await?;
+        return Ok(());
+    }
+
+    workspaces_core::create_workspace_file_core(
+        &state.workspaces,
+        &workspace_id,
+        &path,
+        |root, rel_path| create_workspace_file_inner(root, rel_path),
+    )
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn create_workspace_dir(
+    workspace_id: String,
+    path: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        remote_backend::call_remote(
+            &*state,
+            app,
+            "create_workspace_dir",
+            json!({ "workspaceId": workspace_id, "path": path }),
+        )
+        .await?;
+        return Ok(());
+    }
+
+    workspaces_core::create_workspace_dir_core(
+        &state.workspaces,
+        &workspace_id,
+        &path,
+        |root, rel_path| create_workspace_dir_inner(root, rel_path),
+    )
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn delete_workspace_path(
+    workspace_id: String,
+    path: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        remote_backend::call_remote(
+            &*state,
+            app,
+            "delete_workspace_path",
+            json!({ "workspaceId": workspace_id, "path": path }),
+        )
+        .await?;
+        return Ok(());
+    }
+
+    workspaces_core::delete_workspace_path_core(
+        &state.workspaces,
+        &workspace_id,
+        &path,
+        |root, rel_path| delete_workspace_path_inner(root, rel_path),
+    )
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn move_workspace_path(
+    workspace_id: String,
+    from_path: String,
+    to_path: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        remote_backend::call_remote(
+            &*state,
+            app,
+            "move_workspace_path",
+            json!({ "workspaceId": workspace_id, "fromPath": from_path, "toPath": to_path }),
+        )
+        .await?;
+        return Ok(());
+    }
+
+    workspaces_core::move_workspace_path_core(
+        &state.workspaces,
+        &workspace_id,
+        &from_path,
+        &to_path,
+        |root, from_path, to_path| move_workspace_path_inner(root, from_path, to_path),
     )
     .await
 }

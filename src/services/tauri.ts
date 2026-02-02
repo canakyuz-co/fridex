@@ -611,6 +611,35 @@ export async function searchWorkspaceFiles(
   });
 }
 
+export async function createWorkspaceFile(
+  workspaceId: string,
+  path: string,
+): Promise<void> {
+  return invoke("create_workspace_file", { workspaceId, path });
+}
+
+export async function createWorkspaceDir(
+  workspaceId: string,
+  path: string,
+): Promise<void> {
+  return invoke("create_workspace_dir", { workspaceId, path });
+}
+
+export async function deleteWorkspacePath(
+  workspaceId: string,
+  path: string,
+): Promise<void> {
+  return invoke("delete_workspace_path", { workspaceId, path });
+}
+
+export async function moveWorkspacePath(
+  workspaceId: string,
+  fromPath: string,
+  toPath: string,
+): Promise<void> {
+  return invoke("move_workspace_path", { workspaceId, fromPath, toPath });
+}
+
 export async function readWorkspaceFile(
   workspaceId: string,
   path: string,

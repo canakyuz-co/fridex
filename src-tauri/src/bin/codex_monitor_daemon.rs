@@ -499,6 +499,64 @@ impl DaemonState {
         .await
     }
 
+    async fn create_workspace_file(
+        &self,
+        workspace_id: String,
+        path: String,
+    ) -> Result<(), String> {
+        workspaces_core::create_workspace_file_core(
+            &self.workspaces,
+            &workspace_id,
+            &path,
+            |root, rel_path| create_workspace_file_inner(root, rel_path),
+        )
+        .await
+    }
+
+    async fn create_workspace_dir(
+        &self,
+        workspace_id: String,
+        path: String,
+    ) -> Result<(), String> {
+        workspaces_core::create_workspace_dir_core(
+            &self.workspaces,
+            &workspace_id,
+            &path,
+            |root, rel_path| create_workspace_dir_inner(root, rel_path),
+        )
+        .await
+    }
+
+    async fn delete_workspace_path(
+        &self,
+        workspace_id: String,
+        path: String,
+    ) -> Result<(), String> {
+        workspaces_core::delete_workspace_path_core(
+            &self.workspaces,
+            &workspace_id,
+            &path,
+            |root, rel_path| delete_workspace_path_inner(root, rel_path),
+        )
+        .await
+    }
+
+    async fn move_workspace_path(
+        &self,
+        workspace_id: String,
+        from_path: String,
+        to_path: String,
+    ) -> Result<(), String> {
+        workspaces_core::move_workspace_path_core(
+            &self.workspaces,
+            &workspace_id,
+            &from_path,
+            &to_path,
+            |root, from_path, to_path| move_workspace_path_inner(root, from_path, to_path),
+        )
+        .await
+    }
+
     async fn read_workspace_file(
         &self,
         workspace_id: String,
@@ -1524,6 +1582,33 @@ async fn handle_rpc_request(
                 )
                 .await?;
             serde_json::to_value(results).map_err(|err| err.to_string())
+        }
+        "create_workspace_file" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let path = parse_string(&params, "path")?;
+            state.create_workspace_file(workspace_id, path).await?;
+            Ok(json!({ "ok": true }))
+        }
+        "create_workspace_dir" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let path = parse_string(&params, "path")?;
+            state.create_workspace_dir(workspace_id, path).await?;
+            Ok(json!({ "ok": true }))
+        }
+        "delete_workspace_path" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let path = parse_string(&params, "path")?;
+            state.delete_workspace_path(workspace_id, path).await?;
+            Ok(json!({ "ok": true }))
+        }
+        "move_workspace_path" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let from_path = parse_string(&params, "fromPath")?;
+            let to_path = parse_string(&params, "toPath")?;
+            state
+                .move_workspace_path(workspace_id, from_path, to_path)
+                .await?;
+            Ok(json!({ "ok": true }))
         }
         "read_workspace_file" => {
             let workspace_id = parse_string(&params, "workspaceId")?;

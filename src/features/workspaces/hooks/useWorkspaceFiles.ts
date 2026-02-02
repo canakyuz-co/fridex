@@ -66,6 +66,12 @@ export function useWorkspaceFiles({
     }
   }, [isConnected, onDebug, workspaceId]);
 
+  const refreshFilesLater = useCallback(() => {
+    window.setTimeout(() => {
+      refreshFiles().catch(() => {});
+    }, 200);
+  }, [refreshFiles]);
+
   useEffect(() => {
     setFiles([]);
     lastFetchedWorkspaceId.current = null;
@@ -103,5 +109,6 @@ export function useWorkspaceFiles({
     files: fileOptions,
     isLoading,
     refreshFiles,
+    refreshFilesLater,
   };
 }
