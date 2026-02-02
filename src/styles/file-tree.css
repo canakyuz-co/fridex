@@ -13,6 +13,12 @@
   gap: 6px;
 }
 
+.file-tree-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .file-tree-toggle {
   padding: 4px;
 }
@@ -151,6 +157,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.file-tree-icon.is-folder {
+  color: var(--text-accent);
+}
+
+.file-tree-icon.is-file {
+  color: var(--text-faint);
 }
 
 .file-tree-icon-svg {

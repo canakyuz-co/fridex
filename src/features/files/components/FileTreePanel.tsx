@@ -15,10 +15,21 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import Plus from "lucide-react/dist/esm/icons/plus";
 import ChevronsUpDown from "lucide-react/dist/esm/icons/chevrons-up-down";
-import { FileIcon, FolderIcon, OpenFolderIcon } from "react-files-icons";
 import Search from "lucide-react/dist/esm/icons/search";
+import FilePlus from "lucide-react/dist/esm/icons/file-plus";
+import FolderPlus from "lucide-react/dist/esm/icons/folder-plus";
+import RefreshCcw from "lucide-react/dist/esm/icons/refresh-ccw";
+import FileText from "lucide-react/dist/esm/icons/file-text";
+import Folder from "lucide-react/dist/esm/icons/folder";
+import FolderOpen from "lucide-react/dist/esm/icons/folder-open";
 import { PanelTabs, type PanelTabId } from "../../layout/components/PanelTabs";
-import { readWorkspaceFile } from "../../../services/tauri";
+import {
+  createWorkspaceDir,
+  createWorkspaceFile,
+  deleteWorkspacePath,
+  moveWorkspacePath,
+  readWorkspaceFile,
+} from "../../../services/tauri";
 import type { OpenAppTarget } from "../../../types";
 import { languageFromPath } from "../../../utils/syntax";
 import { FilePreviewPopover } from "./FilePreviewPopover";
@@ -41,6 +52,7 @@ type FileTreePanelProps = {
   showTabs?: boolean;
   showMentionActions?: boolean;
   onOpenFile?: (path: string) => void;
+  onRefreshFiles?: () => void;
   openTargets: OpenAppTarget[];
   openAppIconById: Record<string, string>;
   selectedOpenAppId: string;
@@ -152,6 +164,7 @@ export function FileTreePanel({
   showTabs = true,
   showMentionActions = true,
   onOpenFile,
+  onRefreshFiles,
   openTargets,
   openAppIconById,
   selectedOpenAppId,
@@ -174,6 +187,7 @@ export function FileTreePanel({
     start: number;
     end: number;
   } | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
   const [isDragSelecting, setIsDragSelecting] = useState(false);
   const dragAnchorLineRef = useRef<number | null>(null);
   const dragMovedRef = useRef(false);
@@ -301,6 +315,120 @@ export function FileTreePanel({
       return `${base}/${relativePath}`;
     },
     [workspacePath],
+  );
+
+  const normalizeRelativePath = useCallback((value: string | null) => {
+    if (!value) {
+      return null;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const normalized = trimmed.replace(/^\/+/, "").replace(/\\/g, "/");
+    if (!normalized || normalized.startsWith("../") || normalized.includes("/../")) {
+      return null;
+    }
+    if (normalized.includes("://")) {
+      return null;
+    }
+    return normalized;
+  }, []);
+
+  const joinPath = useCallback((base: string, name: string) => {
+    if (!base) {
+      return name;
+    }
+    return `${base.replace(/\/$/, "")}/${name.replace(/^\//, "")}`;
+  }, []);
+
+  const runFileAction = useCallback(
+    async (action: () => Promise<void>) => {
+      if (actionBusy) {
+        return;
+      }
+      setActionBusy(true);
+      try {
+        await action();
+        onRefreshFiles?.();
+      } catch (error) {
+        alert(error instanceof Error ? error.message : String(error));
+      } finally {
+        setActionBusy(false);
+      }
+    },
+    [actionBusy, onRefreshFiles],
+  );
+
+  const handleCreateFile = useCallback(
+    async (basePath: string) => {
+      const name = normalizeRelativePath(
+        window.prompt("Yeni dosya adi", "new-file.ts"),
+      );
+      if (!name) {
+        return;
+      }
+      const targetPath = joinPath(basePath, name);
+      await runFileAction(() => createWorkspaceFile(workspaceId, targetPath));
+    },
+    [joinPath, normalizeRelativePath, runFileAction, workspaceId],
+  );
+
+  const handleCreateFolder = useCallback(
+    async (basePath: string) => {
+      const name = normalizeRelativePath(
+        window.prompt("Yeni klasor adi", "new-folder"),
+      );
+      if (!name) {
+        return;
+      }
+      const targetPath = joinPath(basePath, name);
+      await runFileAction(() => createWorkspaceDir(workspaceId, targetPath));
+    },
+    [joinPath, normalizeRelativePath, runFileAction, workspaceId],
+  );
+
+  const handleDeletePath = useCallback(
+    async (relativePath: string) => {
+      const confirmDelete = window.confirm(
+        `Silinsin mi?\n${relativePath}`,
+      );
+      if (!confirmDelete) {
+        return;
+      }
+      await runFileAction(() => deleteWorkspacePath(workspaceId, relativePath));
+    },
+    [runFileAction, workspaceId],
+  );
+
+  const handleRenamePath = useCallback(
+    async (relativePath: string) => {
+      const parts = relativePath.split("/");
+      const currentName = parts.pop() ?? relativePath;
+      const baseDir = parts.join("/");
+      const nextName = normalizeRelativePath(
+        window.prompt("Yeni ad", currentName),
+      );
+      if (!nextName || nextName === currentName) {
+        return;
+      }
+      const nextPath = joinPath(baseDir, nextName);
+      await runFileAction(() => moveWorkspacePath(workspaceId, relativePath, nextPath));
+    },
+    [joinPath, normalizeRelativePath, runFileAction, workspaceId],
+  );
+
+  const handleMovePath = useCallback(
+    async (relativePath: string) => {
+      const nextPath = normalizeRelativePath(
+        window.prompt("Yeni konum (path)", relativePath),
+      );
+      if (!nextPath || nextPath === relativePath) {
+        return;
+      }
+      await runFileAction(() => moveWorkspacePath(workspaceId, relativePath, nextPath));
+    },
+    [normalizeRelativePath, runFileAction, workspaceId],
   );
 
   const previewImageSrc = useMemo(() => {
@@ -486,25 +614,56 @@ export function FileTreePanel({
     closePreview,
   ]);
 
-  const showFileMenu = useCallback(
-    async (event: MouseEvent<HTMLButtonElement>, relativePath: string) => {
+  const showNodeMenu = useCallback(
+    async (event: MouseEvent<HTMLButtonElement>, relativePath: string, isFolder: boolean) => {
       event.preventDefault();
       event.stopPropagation();
-      const menu = await Menu.new({
-        items: [
+      const items = [] as MenuItem[];
+      if (isFolder) {
+        items.push(
           await MenuItem.new({
-            text: "Reveal in Finder",
-            action: async () => {
-              await revealItemInDir(resolvePath(relativePath));
-            },
+            text: "New File",
+            action: () => handleCreateFile(relativePath),
           }),
-        ],
-      });
+          await MenuItem.new({
+            text: "New Folder",
+            action: () => handleCreateFolder(relativePath),
+          }),
+        );
+      }
+      items.push(
+        await MenuItem.new({
+          text: "Rename",
+          action: () => handleRenamePath(relativePath),
+        }),
+        await MenuItem.new({
+          text: "Move",
+          action: () => handleMovePath(relativePath),
+        }),
+        await MenuItem.new({
+          text: "Delete",
+          action: () => handleDeletePath(relativePath),
+        }),
+        await MenuItem.new({
+          text: "Reveal in Finder",
+          action: async () => {
+            await revealItemInDir(resolvePath(relativePath));
+          },
+        }),
+      );
+      const menu = await Menu.new({ items });
       const window = getCurrentWindow();
       const position = new LogicalPosition(event.clientX, event.clientY);
       await menu.popup(position, window);
     },
-    [resolvePath],
+    [
+      handleCreateFile,
+      handleCreateFolder,
+      handleDeletePath,
+      handleMovePath,
+      handleRenamePath,
+      resolvePath,
+    ],
   );
 
   const renderNode = (node: FileTreeNode, depth: number) => {
@@ -529,9 +688,7 @@ export function FileTreePanel({
               openPreview(node.path, event.currentTarget);
             }}
             onContextMenu={(event) => {
-              if (!isFolder) {
-                void showFileMenu(event, node.path);
-              }
+              void showNodeMenu(event, node.path, isFolder);
             }}
           >
             {isFolder ? (
@@ -541,15 +698,18 @@ export function FileTreePanel({
             ) : (
               <span className="file-tree-spacer" aria-hidden />
             )}
-            <span className="file-tree-icon" aria-hidden>
+            <span
+              className={`file-tree-icon ${isFolder ? "is-folder" : "is-file"}`}
+              aria-hidden
+            >
               {isFolder ? (
                 isExpanded ? (
-                  <OpenFolderIcon className="file-tree-icon-svg" name={node.name} />
+                  <FolderOpen className="file-tree-icon-svg" />
                 ) : (
-                  <FolderIcon className="file-tree-icon-svg" name={node.name} />
+                  <Folder className="file-tree-icon-svg" />
                 )
               ) : (
-                <FileIcon className="file-tree-icon-svg" name={node.name} />
+                <FileText className="file-tree-icon-svg" />
               )}
             </span>
             <span className="file-tree-name">{node.name}</span>
@@ -594,6 +754,38 @@ export function FileTreePanel({
               ? "Loading files"
               : "No files"}
         </div>
+          <div className="file-tree-actions" role="group" aria-label="File actions">
+            <button
+              type="button"
+              className="ghost icon-button"
+              onClick={() => handleCreateFile("")}
+              aria-label="New file"
+              title="New file"
+              disabled={actionBusy}
+            >
+              <FilePlus size={14} aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="ghost icon-button"
+              onClick={() => handleCreateFolder("")}
+              aria-label="New folder"
+              title="New folder"
+              disabled={actionBusy}
+            >
+              <FolderPlus size={14} aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="ghost icon-button"
+              onClick={() => onRefreshFiles?.()}
+              aria-label="Refresh files"
+              title="Refresh files"
+              disabled={actionBusy}
+            >
+              <RefreshCcw size={14} aria-hidden />
+            </button>
+          </div>
           {hasFolders ? (
             <button
               type="button"

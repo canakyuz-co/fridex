@@ -128,6 +128,7 @@ type LayoutNodesOptions = {
   openAppIconById: Record<string, string>;
   selectedOpenAppId: string;
   onSelectOpenAppId: (id: string) => void;
+  onRefreshFiles?: () => void;
   approvals: ApprovalRequest[];
   userInputRequests: RequestUserInputRequest[];
   handleApprovalDecision: (
@@ -759,6 +760,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
         openAppIconById={options.openAppIconById}
         selectedOpenAppId={options.selectedOpenAppId}
         onSelectOpenAppId={options.onSelectOpenAppId}
+        onRefreshFiles={options.onRefreshFiles}
       />
     );
   } else if (options.filePanelMode === "prompts") {

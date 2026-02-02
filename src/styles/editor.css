@@ -134,6 +134,46 @@
   background: var(--surface-sidebar);
 }
 
+.editor-statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--text-faint);
+  background: var(--surface-topbar);
+  border-top: 1px solid var(--border-muted);
+}
+
+.editor-status-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.editor-status-item {
+  white-space: nowrap;
+}
+
+.editor-status-name {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-emphasis);
+}
+
+.editor-status-pill {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-muted);
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 0.01em;
+}
+
 .editor-split {
   flex: 1;
   min-height: 0;

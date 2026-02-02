@@ -515,7 +515,7 @@ function MainApp() {
     getWorkspacePromptsDir,
     getGlobalPromptsDir,
   } = useCustomPrompts({ activeWorkspace, onDebug: addDebugEntry });
-  const { files, isLoading: isFilesLoading } = useWorkspaceFiles({
+  const { files, isLoading: isFilesLoading, refreshFilesLater } = useWorkspaceFiles({
     activeWorkspace,
     onDebug: addDebugEntry,
   });
@@ -1804,6 +1804,7 @@ function MainApp() {
         sidebarCollapsed: collapsed,
       });
     },
+    onRefreshFiles: refreshFilesLater,
     onSelectThread: (workspaceId, threadId) => {
       exitDiffView();
       resetPullRequestSelection();

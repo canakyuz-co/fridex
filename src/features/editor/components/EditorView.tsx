@@ -174,6 +174,8 @@ export function EditorView({
   >([]);
   const [workspaceSymbolLoading, setWorkspaceSymbolLoading] = useState(false);
   const [workspaceSymbolError, setWorkspaceSymbolError] = useState<string | null>(null);
+  const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
+  const [lineCount, setLineCount] = useState(1);
   const shiftTapRef = useRef(0);
   const pendingRevealRef = useRef<{ path: string; line: number; column: number } | null>(
     null,
@@ -346,6 +348,45 @@ export function EditorView({
     editorRef.current?.getAction("editor.action.startFindReplaceAction")?.run();
   }, []);
 
+  const statusLanguage = useMemo(() => {
+    if (activeBuffer?.language) {
+      return activeBuffer.language.toUpperCase();
+    }
+    if (activeBufferPath) {
+      return (languageFromPath(activeBufferPath) ?? "text").toUpperCase();
+    }
+    return "TEXT";
+  }, [activeBuffer?.language, activeBufferPath]);
+
+  const statusSize = useMemo(() => {
+    if (!activeBuffer) {
+      return "0 B";
+    }
+    const content = activeBuffer.content ?? "";
+    const rawSize = content.length;
+    if (rawSize === 0) {
+      return "0 B";
+    }
+    let bytes = rawSize;
+    if (rawSize < 200_000 && typeof TextEncoder !== "undefined") {
+      bytes = new TextEncoder().encode(content).length;
+    }
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }, [activeBuffer]);
+
+  const statusFileName = useMemo(() => {
+    if (!activeBufferPath) {
+      return "No file";
+    }
+    return activeBufferPath.split("/").pop() ?? activeBufferPath;
+  }, [activeBufferPath]);
+
   useEffect(() => {
     if (!monacoRef.current) {
       return;
@@ -368,6 +409,47 @@ export function EditorView({
     }
     setMarkdownView(isMarkdown ? "split" : "code");
   }, [activeBufferPath, isMarkdown]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) {
+      return;
+    }
+    const updateFromEditor = () => {
+      const position = editor.getPosition();
+      if (position) {
+        setCursorPosition({
+          line: position.lineNumber,
+          column: position.column,
+        });
+      }
+      const model = editor.getModel();
+      if (model) {
+        setLineCount(model.getLineCount());
+      }
+    };
+    updateFromEditor();
+    const cursorDisposable = editor.onDidChangeCursorPosition((event) => {
+      setCursorPosition({
+        line: event.position.lineNumber,
+        column: event.position.column,
+      });
+    });
+    const modelDisposable = editor.onDidChangeModel(() => {
+      updateFromEditor();
+    });
+    const contentDisposable = editor.onDidChangeModelContent(() => {
+      const model = editor.getModel();
+      if (model) {
+        setLineCount(model.getLineCount());
+      }
+    });
+    return () => {
+      cursorDisposable.dispose();
+      modelDisposable.dispose();
+      contentDisposable.dispose();
+    };
+  }, [activeBufferPath]);
 
   useEffect(() => {
     const pending = pendingRevealRef.current;
@@ -851,6 +933,29 @@ export function EditorView({
       ) : (
         <EditorPlaceholder hasWorkspace />
       )}
+      {activeBuffer ? (
+        <div className="editor-statusbar" role="status" aria-live="polite">
+          <div className="editor-status-group">
+            <span className="editor-status-item editor-status-name">{statusFileName}</span>
+            {activeBuffer.isTruncated ? (
+              <span className="editor-status-pill">Truncated</span>
+            ) : null}
+            {activeBuffer.isDirty ? (
+              <span className="editor-status-pill">Modified</span>
+            ) : (
+              <span className="editor-status-pill">Saved</span>
+            )}
+          </div>
+          <div className="editor-status-group">
+            <span className="editor-status-item">
+              Ln {cursorPosition.line}, Col {cursorPosition.column}
+            </span>
+            <span className="editor-status-item">{lineCount} lines</span>
+            <span className="editor-status-item">{statusSize}</span>
+            <span className="editor-status-item">{statusLanguage}</span>
+          </div>
+        </div>
+      ) : null}
       <EditorCommandPalette
         isOpen={commandPaletteOpen}
         onClose={closeCommandPalette}
