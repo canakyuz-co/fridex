@@ -167,8 +167,6 @@ export function EditorWorkspaceSearch({
   }
 
   const showTextControls = activeTab === "text" || activeTab === "all";
-  const showCustomInclude = showTextControls && includePreset === "custom";
-  const showCustomExclude = showTextControls && excludePreset === "custom";
 
   return (
     <div className="editor-workspace-search" role="dialog" aria-modal="true">
@@ -179,20 +177,6 @@ export function EditorWorkspaceSearch({
         aria-label="Close workspace search"
       />
       <div className="editor-workspace-search__panel">
-        <div className="editor-workspace-search__topbar">
-          <div className="editor-workspace-search__title">
-            <Search size={16} aria-hidden />
-            Search
-          </div>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X size={14} aria-hidden />
-          </button>
-        </div>
         <div className="editor-workspace-search__tabs">
           {(["all", "classes", "files", "symbols", "actions", "text"] as WorkspaceSearchTab[]).map(
             (tab) => (
@@ -208,6 +192,14 @@ export function EditorWorkspaceSearch({
               </button>
             ),
           )}
+          <button
+            type="button"
+            className="icon-button editor-workspace-search__close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={14} aria-hidden />
+          </button>
         </div>
         <div className="editor-workspace-search__search-row">
           <div className="editor-workspace-search__search-input">
@@ -241,13 +233,6 @@ export function EditorWorkspaceSearch({
                     </option>
                   ))}
                 </select>
-                <input
-                  type="text"
-                  value={includeGlobs}
-                  onChange={(event) => onIncludeChange(event.target.value)}
-                  placeholder="Custom"
-                  disabled={!showCustomInclude}
-                />
               </div>
             </label>
             <label className="editor-workspace-search__filter">
@@ -270,18 +255,7 @@ export function EditorWorkspaceSearch({
                     </option>
                   ))}
                 </select>
-                <input
-                  type="text"
-                  value={excludeGlobs}
-                  onChange={(event) => onExcludeChange(event.target.value)}
-                  placeholder="Custom"
-                  disabled={!showCustomExclude}
-                />
               </div>
-            </label>
-            <label className="editor-workspace-search__filter editor-workspace-search__filter--toggle">
-              <span>Include non-project</span>
-              <input type="checkbox" />
             </label>
           </div>
         </div>
