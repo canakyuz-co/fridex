@@ -937,6 +937,75 @@ fn search_workspace_files_inner(
 
 const MAX_WORKSPACE_FILE_BYTES: u64 = 400_000;
 
+fn resolve_workspace_path(root: &PathBuf, relative_path: &str) -> Result<PathBuf, String> {
+    let canonical_root = root
+        .canonicalize()
+        .map_err(|err| format!("Failed to resolve workspace root: {err}"))?;
+    let candidate = canonical_root.join(relative_path);
+    if let Some(parent) = candidate.parent() {
+        let canonical_parent = parent
+            .canonicalize()
+            .map_err(|err| format!("Failed to resolve parent directory: {err}"))?;
+        if !canonical_parent.starts_with(&canonical_root) {
+            return Err("Invalid file path".to_string());
+        }
+    }
+    Ok(candidate)
+}
+
+fn create_workspace_file_inner(root: &PathBuf, relative_path: &str) -> Result<(), String> {
+    let path = resolve_workspace_path(root, relative_path)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|err| format!("Failed to create directory: {err}"))?;
+    }
+    OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&path)
+        .map_err(|err| format!("Failed to create file: {err}"))?;
+    Ok(())
+}
+
+fn create_workspace_dir_inner(root: &PathBuf, relative_path: &str) -> Result<(), String> {
+    let path = resolve_workspace_path(root, relative_path)?;
+    std::fs::create_dir_all(&path)
+        .map_err(|err| format!("Failed to create directory: {err}"))?;
+    Ok(())
+}
+
+fn delete_workspace_path_inner(root: &PathBuf, relative_path: &str) -> Result<(), String> {
+    let path = resolve_workspace_path(root, relative_path)?;
+    if !path.exists() {
+        return Err("Path does not exist".to_string());
+    }
+    let metadata = std::fs::metadata(&path)
+        .map_err(|err| format!("Failed to read metadata: {err}"))?;
+    if metadata.is_dir() {
+        std::fs::remove_dir_all(&path)
+            .map_err(|err| format!("Failed to remove folder: {err}"))?;
+    } else {
+        std::fs::remove_file(&path).map_err(|err| format!("Failed to remove file: {err}"))?;
+    }
+    Ok(())
+}
+
+fn move_workspace_path_inner(
+    root: &PathBuf,
+    from_path: &str,
+    to_path: &str,
+) -> Result<(), String> {
+    let from = resolve_workspace_path(root, from_path)?;
+    let to = resolve_workspace_path(root, to_path)?;
+    if let Some(parent) = to.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|err| format!("Failed to create destination directory: {err}"))?;
+    }
+    std::fs::rename(&from, &to).map_err(|err| format!("Failed to move path: {err}"))?;
+    Ok(())
+}
+
 fn read_workspace_file_inner(
     root: &PathBuf,
     relative_path: &str,
