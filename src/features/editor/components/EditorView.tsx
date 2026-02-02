@@ -205,7 +205,7 @@ export function EditorView({
         { token: "class", foreground: "D2A8FF" },
       ],
       colors: {
-        "editor.background": readVar("--surface-messages", "#0c1119"),
+        "editor.background": readVar("--surface-sidebar", "#0c1119"),
         "editor.foreground": readVar("--text-primary", "#e6e7ea"),
         "editorLineNumber.foreground": readVar("--text-dim", "#586072"),
         "editorLineNumber.activeForeground": readVar("--text-stronger", "#c5cad6"),
@@ -216,7 +216,7 @@ export function EditorView({
         "editorIndentGuide.activeBackground": readVar("--border-strong", "#2a3546"),
         "editor.lineHighlightBackground": "transparent",
         "editorLineHighlightBorder": "transparent",
-        "editorGutter.background": readVar("--surface-messages", "#0c1119"),
+        "editorGutter.background": readVar("--surface-sidebar", "#0c1119"),
         "editorWhitespace.foreground": readVar("--border-muted", "#2a3546"),
         "editorRuler.foreground": readVar("--border-muted", "#1f2a3a"),
       },
