@@ -26,6 +26,7 @@ import "./styles/worktree-modal.css";
 import "./styles/clone-modal.css";
 import "./styles/settings.css";
 import "./styles/editor.css";
+import "./styles/editor-command-palette.css";
 import "./styles/compact-base.css";
 import "./styles/compact-phone.css";
 import "./styles/compact-tablet.css";
@@ -2205,10 +2206,17 @@ function MainApp() {
       openPaths={editorState.openPaths}
       activePath={editorState.activePath}
       buffersByPath={editorState.buffersByPath}
+      availablePaths={files}
+      editorKeymap={appSettings.editorKeymap}
+      launchScript={launchScriptState.launchScript}
+      launchScripts={launchScriptsState.launchScripts}
       onSelectPath={editorState.setActivePath}
       onClosePath={editorState.closeFile}
+      onOpenPath={editorState.openFile}
       onContentChange={editorState.updateContent}
       onSavePath={editorState.saveFile}
+      onRunLaunchScript={launchScriptState.onRunLaunchScript}
+      onRunLaunchScriptEntry={launchScriptsState.onRunScript}
       onMonacoReady={editorLsp.onMonacoReady}
     />
   );

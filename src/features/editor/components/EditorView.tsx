@@ -8,6 +8,8 @@ import Eye from "lucide-react/dist/esm/icons/eye";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorPlaceholder } from "./EditorPlaceholder";
 import { Markdown } from "../../messages/components/Markdown";
+import { EditorCommandPalette } from "./EditorCommandPalette";
+import type { EditorKeymap, LaunchScriptEntry } from "../../../types";
 
 import "monaco-editor/esm/vs/language/css/monaco.contribution";
 import "monaco-editor/esm/vs/language/html/monaco.contribution";
@@ -39,10 +41,17 @@ type EditorViewProps = {
   openPaths: string[];
   activePath: string | null;
   buffersByPath: Record<string, EditorBuffer>;
+  availablePaths: string[];
+  editorKeymap: EditorKeymap;
+  launchScript: string | null;
+  launchScripts: LaunchScriptEntry[];
   onSelectPath: (path: string) => void;
   onClosePath: (path: string) => void;
+  onOpenPath: (path: string) => void;
   onContentChange: (path: string, value: string) => void;
   onSavePath: (path: string) => void;
+  onRunLaunchScript: () => void;
+  onRunLaunchScriptEntry: (id: string) => void;
   onMonacoReady?: (
     monaco: Monaco,
     editor: MonacoEditor.IStandaloneCodeEditor,
@@ -87,10 +96,17 @@ export function EditorView({
   openPaths,
   activePath,
   buffersByPath,
+  availablePaths,
+  editorKeymap,
+  launchScript,
+  launchScripts,
   onSelectPath,
   onClosePath,
+  onOpenPath,
   onContentChange,
   onSavePath,
+  onRunLaunchScript,
+  onRunLaunchScriptEntry,
   onMonacoReady,
 }: EditorViewProps) {
   const activeBuffer = activePath ? buffersByPath[activePath] : null;
@@ -103,6 +119,17 @@ export function EditorView({
   );
   const activePathRef = useRef(activePath);
   const monacoRef = useRef<Monaco | null>(null);
+  const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const shiftTapRef = useRef(0);
+
+  const openCommandPalette = useCallback(() => {
+    setCommandPaletteOpen(true);
+  }, []);
+
+  const closeCommandPalette = useCallback(() => {
+    setCommandPaletteOpen(false);
+  }, []);
 
   useEffect(() => {
     activePathRef.current = activePath;
@@ -213,6 +240,7 @@ export function EditorView({
   const handleMount = useCallback(
     (editorInstance: MonacoEditor.IStandaloneCodeEditor, monaco: Monaco) => {
       monacoRef.current = monaco;
+      editorRef.current = editorInstance;
       applyTheme(monaco);
       onMonacoReady?.(monaco, editorInstance);
       editorInstance.addCommand(
@@ -227,6 +255,14 @@ export function EditorView({
     },
     [applyTheme, onSavePath, onMonacoReady],
   );
+
+  const openFind = useCallback(() => {
+    editorRef.current?.getAction("actions.find")?.run();
+  }, []);
+
+  const openReplace = useCallback(() => {
+    editorRef.current?.getAction("editor.action.startFindReplaceAction")?.run();
+  }, []);
 
   useEffect(() => {
     if (!monacoRef.current) {
@@ -251,9 +287,64 @@ export function EditorView({
     setMarkdownView(isMarkdown ? "split" : "code");
   }, [activeBufferPath, isMarkdown]);
 
+  useEffect(() => {
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) {
+        return;
+      }
+      if (commandPaletteOpen) {
+        return;
+      }
+      if (editorKeymap === "jetbrains" && event.key === "Shift") {
+        const now = Date.now();
+        if (now - shiftTapRef.current < 350) {
+          shiftTapRef.current = 0;
+          event.preventDefault();
+          openCommandPalette();
+          return;
+        }
+        shiftTapRef.current = now;
+        return;
+      }
+      if (event.key.toLowerCase() === "p" && event.shiftKey && (event.metaKey || event.ctrlKey)) {
+        if (editorKeymap === "vscode" || editorKeymap === "default") {
+          event.preventDefault();
+          openCommandPalette();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown, true);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalKeyDown, true);
+    };
+  }, [commandPaletteOpen, editorKeymap, openCommandPalette]);
+
   if (!workspaceId) {
     return <EditorPlaceholder hasWorkspace={false} />;
   }
+
+  const isLargeFile = Boolean(
+    activeBuffer &&
+      (activeBuffer.isTruncated || activeBuffer.content.length > 1_000_000),
+  );
+  const editorOptions = {
+    minimap: { enabled: false },
+    fontFamily: "var(--code-font-family)",
+    fontSize: 13,
+    lineHeight: 20,
+    scrollBeyondLastLine: false,
+    wordWrap: isLargeFile ? "off" : "on",
+    readOnly: activeBuffer?.isTruncated ?? false,
+    renderWhitespace: isLargeFile ? "none" : "selection",
+    renderLineHighlight: "none",
+    "semanticHighlighting.enabled": false,
+    smoothScrolling: !isLargeFile,
+    cursorSmoothCaretAnimation: isLargeFile ? "off" : "on",
+    quickSuggestions: isLargeFile ? false : { other: true, comments: false, strings: false },
+    quickSuggestionsDelay: isLargeFile ? 300 : 100,
+    suggestOnTriggerCharacters: !isLargeFile,
+    parameterHints: { enabled: !isLargeFile },
+  } as const;
 
   return (
     <div className="editor-shell">
@@ -358,7 +449,7 @@ export function EditorView({
                         path={activeBuffer.path}
                         language={activeBuffer.language ?? undefined}
                         value={activeBuffer.content}
-                        theme="friday-dark"
+                        theme="friday-app"
                         height="100%"
                         width="100%"
                         onChange={(value) => {
@@ -366,18 +457,7 @@ export function EditorView({
                         }}
                         beforeMount={handleBeforeMount}
                         onMount={handleMount}
-                        options={{
-                          minimap: { enabled: false },
-                          fontFamily: "var(--code-font-family)",
-                          fontSize: 13,
-                          lineHeight: 20,
-                          scrollBeyondLastLine: false,
-                          wordWrap: "on",
-                          readOnly: activeBuffer.isTruncated,
-                          renderWhitespace: "selection",
-                          renderLineHighlight: "none",
-                          "semanticHighlighting.enabled": false,
-                        }}
+                        options={editorOptions}
                       />
                     </div>
                   ) : null}
@@ -394,7 +474,7 @@ export function EditorView({
                   path={activeBuffer.path}
                   language={activeBuffer.language ?? undefined}
                   value={activeBuffer.content}
-                  theme="friday-dark"
+                  theme="friday-app"
                   height="100%"
                   width="100%"
                   onChange={(value) => {
@@ -402,18 +482,7 @@ export function EditorView({
                   }}
                   beforeMount={handleBeforeMount}
                   onMount={handleMount}
-                  options={{
-                    minimap: { enabled: false },
-                    fontFamily: "var(--code-font-family)",
-                    fontSize: 13,
-                    lineHeight: 20,
-                    scrollBeyondLastLine: false,
-                    wordWrap: "on",
-                    readOnly: activeBuffer.isTruncated,
-                    renderWhitespace: "selection",
-                    renderLineHighlight: "none",
-                    "semanticHighlighting.enabled": false,
-                  }}
+                  options={editorOptions}
                 />
               )}
             </>
@@ -422,6 +491,20 @@ export function EditorView({
       ) : (
         <EditorPlaceholder hasWorkspace />
       )}
+      <EditorCommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={closeCommandPalette}
+        editorKeymap={editorKeymap}
+        availablePaths={availablePaths}
+        openPaths={openPaths}
+        onOpenPath={onOpenPath}
+        onOpenFind={openFind}
+        onOpenReplace={openReplace}
+        launchScript={launchScript}
+        launchScripts={launchScripts}
+        onRunLaunchScript={onRunLaunchScript}
+        onRunLaunchScriptEntry={onRunLaunchScriptEntry}
+      />
     </div>
   );
 }
