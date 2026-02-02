@@ -19,6 +19,9 @@ import {
   sendClaudeMessageSync,
   sendGeminiCliMessageSync,
   sendGeminiMessageSync,
+  acpStartSession,
+  acpSend,
+  acpStopSession,
   type ClaudeMessage,
   type ClaudeRateLimits,
   type ClaudeUsage,
@@ -165,6 +168,41 @@ function buildPlanPrompt(userText: string, attempt: number) {
   return [...baseInstruction, ...retry, "", "User request:", userText].join("\n");
 }
 
+function extractAcpText(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const value = (payload as Record<string, unknown>).result ?? payload;
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (typeof record.content === "string") {
+      return record.content;
+    }
+    if (typeof record.text === "string") {
+      return record.text;
+    }
+    const message = record.message;
+    if (message && typeof message === "object") {
+      const msgRecord = message as Record<string, unknown>;
+      if (typeof msgRecord.content === "string") {
+        return msgRecord.content;
+      }
+    }
+    const choices = record.choices;
+    if (Array.isArray(choices) && choices[0]) {
+      const first = choices[0] as Record<string, unknown>;
+      const firstMessage = first.message as Record<string, unknown> | undefined;
+      if (firstMessage && typeof firstMessage.content === "string") {
+        return firstMessage.content;
+      }
+    }
+  }
+  return null;
+}
+
 export function useThreadMessaging({
   activeWorkspace,
   activeThreadId,
@@ -304,14 +342,136 @@ export function useThreadMessaging({
       });
       try {
         // Check if this is a Claude model (format: "providerId:model-name")
-        const isOtherAiModel = resolvedModel?.includes(":") ?? false;
-        const colonIndex = resolvedModel?.indexOf(":") ?? -1;
-        const providerId = isOtherAiModel ? resolvedModel!.slice(0, colonIndex) : null;
-        const provider = providerId ? otherAiProviders.find((p) => p.id === providerId) : null;
+      const isOtherAiModel = resolvedModel?.includes(":") ?? false;
+      const colonIndex = resolvedModel?.indexOf(":") ?? -1;
+      const providerId = isOtherAiModel ? resolvedModel!.slice(0, colonIndex) : null;
+      const provider = providerId ? otherAiProviders.find((p) => p.id === providerId) : null;
+      const modelName = isOtherAiModel ? resolvedModel!.slice(colonIndex + 1) : null;
 
-        if (provider && provider.provider === "claude") {
-          // Claude provider - use CLI or API
-          const useCli = Boolean(provider.command);
+      if (provider && provider.protocol === "acp") {
+        const command = provider.command?.trim();
+        if (!command) {
+          markProcessing(threadId, false);
+          pushThreadErrorMessage(
+            threadId,
+            "ACP not configured. Set a CLI command in Settings > Other AI.",
+          );
+          safeMessageActivity();
+          return;
+        }
+
+        dispatch({
+          type: "upsertItem",
+          workspaceId: workspace.id,
+          threadId,
+          item: {
+            id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            kind: "message",
+            role: "user",
+            text: finalText,
+          },
+          hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
+        });
+
+        const promptText = isPlanMode ? buildPlanPrompt(finalText, 0) : finalText;
+        const requestId = `acp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const request = {
+          jsonrpc: "2.0",
+          id: requestId,
+          method: "prompt",
+          params: {
+            prompt: promptText,
+            model: modelName,
+          },
+        };
+        try {
+          const sessionId = await acpStartSession({
+            command,
+            args: provider.args?.trim() ? provider.args.trim().split(/\\s+/) : [],
+            env: provider.env ?? undefined,
+          });
+          let response: unknown;
+          try {
+            response = await acpSend(sessionId, request);
+          } finally {
+            await acpStopSession(sessionId).catch(() => {});
+          }
+          const responseText = extractAcpText(response);
+          if (!responseText) {
+            throw new Error("ACP response did not include text.");
+          }
+          if (isPlanMode) {
+            const turnId = activeTurnIdByThread[threadId] ?? "pending";
+            const parsed = normalizePlanPayload(
+              turnId,
+              extractPlanJson(responseText),
+            );
+            if (!parsed) {
+              markProcessing(threadId, false);
+              pushThreadErrorMessage(
+                threadId,
+                "Plan mode failed: invalid response from ACP agent. Try again.",
+              );
+              safeMessageActivity();
+              return;
+            }
+            dispatch({
+              type: "setThreadPlan",
+              threadId,
+              plan: parsed,
+            });
+            dispatch({
+              type: "upsertItem",
+              workspaceId: workspace.id,
+              threadId,
+              item: {
+                id: `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                kind: "message",
+                role: "assistant",
+                text: formatPlanAsMessage(parsed),
+              },
+              hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
+            });
+          } else {
+            dispatch({
+              type: "upsertItem",
+              workspaceId: workspace.id,
+              threadId,
+              item: {
+                id: `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                kind: "message",
+                role: "assistant",
+                text: responseText,
+              },
+              hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
+            });
+          }
+          markProcessing(threadId, false);
+          safeMessageActivity();
+          return;
+        } catch (error) {
+          onDebug?.({
+            id: `${Date.now()}-acp-error`,
+            timestamp: Date.now(),
+            source: "error",
+            label: "acp/send error",
+            payload: error instanceof Error ? error.message : String(error),
+          });
+          if (!provider.command) {
+            markProcessing(threadId, false);
+            pushThreadErrorMessage(
+              threadId,
+              "ACP request failed and no CLI fallback is configured.",
+            );
+            safeMessageActivity();
+            return;
+          }
+        }
+      }
+
+      if (provider && provider.provider === "claude") {
+        // Claude provider - use CLI or API
+        const useCli = Boolean(provider.command);
           const useApi = Boolean(provider.apiKey) && !useCli;
 
           if (!useCli && !useApi) {

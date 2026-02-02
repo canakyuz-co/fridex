@@ -223,6 +223,8 @@ export type OtherAiProvider = {
   args: string | null;
   models: string[];
   defaultModel: string | null;
+  protocol?: "acp" | "api" | "cli" | null;
+  env?: Record<string, string> | null;
 };
 
 export type CodexDoctorResult = {

@@ -340,6 +340,10 @@ pub(crate) struct OtherAiProvider {
     pub(crate) models: Vec<String>,
     #[serde(default, rename = "defaultModel")]
     pub(crate) default_model: Option<String>,
+    #[serde(default)]
+    pub(crate) protocol: Option<String>,
+    #[serde(default)]
+    pub(crate) env: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -842,6 +846,8 @@ fn default_other_ai_providers() -> Vec<OtherAiProvider> {
                 "claude-4.5-sonnet".to_string(),
             ],
             default_model: None,
+            protocol: Some("acp".to_string()),
+            env: None,
         },
         OtherAiProvider {
             id: "gemini".to_string(),
@@ -853,6 +859,8 @@ fn default_other_ai_providers() -> Vec<OtherAiProvider> {
             args: None,
             models: Vec::new(),
             default_model: None,
+            protocol: Some("acp".to_string()),
+            env: None,
         },
     ]
 }

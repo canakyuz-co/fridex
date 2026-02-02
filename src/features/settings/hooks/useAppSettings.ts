@@ -128,6 +128,15 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
     : hasStoredSelection
       ? storedOpenAppId
       : normalizedTargets[0]?.id ?? DEFAULT_OPEN_APP_ID;
+  const normalizeProtocol = (
+    value: string | null | undefined,
+  ): "acp" | "api" | "cli" => {
+    const normalized = value?.trim().toLowerCase();
+    if (normalized === "acp" || normalized === "api" || normalized === "cli") {
+      return normalized;
+    }
+    return "acp";
+  };
   const normalizedOtherAiProviders = (settings.otherAiProviders ?? []).map(
     (provider) => ({
       ...provider,
@@ -140,6 +149,8 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
             .filter((model) => model.length > 0)
         : [],
       defaultModel: provider.defaultModel?.trim() ? provider.defaultModel.trim() : null,
+      protocol: normalizeProtocol(provider.protocol),
+      env: provider.env && typeof provider.env === "object" ? provider.env : null,
     }),
   );
   const normalizeFontWithLegacy = (

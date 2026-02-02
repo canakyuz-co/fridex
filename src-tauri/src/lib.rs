@@ -26,6 +26,7 @@ mod utils;
 mod window;
 mod workspaces;
 mod ai_core;
+mod acp;
 mod claude_api;
 mod claude_cli;
 mod gemini_api;
@@ -100,6 +101,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             ai_core::commands::ai_provider_status,
             ai_core::commands::ai_generate_stream,
+            acp::acp_start_session,
+            acp::acp_send,
+            acp::acp_stop_session,
             claude_api::send_claude_message,
             claude_api::send_claude_message_sync,
             claude_cli::send_claude_cli_message,

@@ -149,6 +149,8 @@ type OtherAiDraft = {
   command: string;
   args: string;
   modelsText: string;
+  protocol: string;
+  envText: string;
 };
 
 const normalizeTextValue = (value: string) => {
@@ -166,6 +168,36 @@ const parseModelList = (value: string) =>
     ),
   );
 
+const formatEnvText = (value: Record<string, string> | null | undefined) => {
+  if (!value) {
+    return "";
+  }
+  return Object.entries(value)
+    .map(([key, val]) => `${key}=${val}`)
+    .join("\n");
+};
+
+const parseEnvText = (value: string) => {
+  const env: Record<string, string> = {};
+  value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .forEach((line) => {
+      const index = line.indexOf("=");
+      if (index <= 0) {
+        return;
+      }
+      const key = line.slice(0, index).trim();
+      const val = line.slice(index + 1).trim();
+      if (!key) {
+        return;
+      }
+      env[key] = val;
+    });
+  return env;
+};
+
 const normalizeProviderType = (
   value: string,
   fallback: AppSettings["otherAiProviders"][number]["provider"],
@@ -175,6 +207,14 @@ const normalizeProviderType = (
     return normalized;
   }
   return fallback;
+};
+
+const normalizeProtocol = (value: string): "acp" | "api" | "cli" => {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "acp" || normalized === "api" || normalized === "cli") {
+    return normalized;
+  }
+  return "acp";
 };
 
 const buildOtherAiDrafts = (providers: AppSettings["otherAiProviders"]) =>
@@ -188,6 +228,8 @@ const buildOtherAiDrafts = (providers: AppSettings["otherAiProviders"]) =>
       command: provider.command ?? "",
       args: provider.args ?? "",
       modelsText: (provider.models ?? []).join("\n"),
+      protocol: provider.protocol ?? "acp",
+      envText: formatEnvText(provider.env),
     };
     return acc;
   }, {});
@@ -892,6 +934,8 @@ export function SettingsView({
       const nextCommand = draft?.command ?? provider.command ?? "";
       const nextArgs = draft?.args ?? provider.args ?? "";
       const nextModelsText = draft?.modelsText ?? (provider.models ?? []).join("\n");
+      const nextProtocol = draft?.protocol ?? provider.protocol ?? "acp";
+      const nextEnvText = draft?.envText ?? formatEnvText(provider.env);
       return {
         id: provider.id,
         label: (nextLabel ?? provider.id).trim() || provider.id,
@@ -905,6 +949,8 @@ export function SettingsView({
         args: normalizeTextValue(nextArgs) ?? null,
         models: parseModelList(nextModelsText),
         defaultModel: null,
+        protocol: normalizeProtocol(nextProtocol),
+        env: parseEnvText(nextEnvText),
       };
     },
     [],
@@ -1009,6 +1055,8 @@ export function SettingsView({
       args: null,
       models: [],
       defaultModel: null,
+      protocol: "acp",
+      env: null,
     };
     const nextProviders = [
       ...appSettings.otherAiProviders,
@@ -3573,6 +3621,8 @@ export function SettingsView({
                     command: provider.command ?? "",
                     args: provider.args ?? "",
                     modelsText: (provider.models ?? []).join("\n"),
+                    protocol: provider.protocol ?? "acp",
+                    envText: formatEnvText(provider.env),
                   };
                   const fetchState = otherAiFetchState[provider.id];
                   return (
@@ -3679,6 +3729,32 @@ export function SettingsView({
                       <div className="settings-help">
                         CLI args are passed before the prompt. Keep output set to stream JSON.
                       </div>
+                      <label className="settings-field-label">Protocol</label>
+                      <select
+                        className="settings-select"
+                        value={draft.protocol}
+                        onChange={(event) =>
+                          handleOtherAiDraftChange(provider.id, {
+                            protocol: event.target.value,
+                          })
+                        }
+                      >
+                        <option value="acp">ACP (recommended)</option>
+                        <option value="api">API</option>
+                        <option value="cli">CLI</option>
+                      </select>
+                      <label className="settings-field-label">Env (KEY=VALUE)</label>
+                      <textarea
+                        className="settings-input"
+                        rows={3}
+                        value={draft.envText}
+                        placeholder="API_KEY=...\nREGION=us"
+                        onChange={(event) =>
+                          handleOtherAiDraftChange(provider.id, {
+                            envText: event.target.value,
+                          })
+                        }
+                      />
                       <div className="settings-field-row">
                         <label className="settings-field-label">Models</label>
                         <button

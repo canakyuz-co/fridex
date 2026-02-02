@@ -75,7 +75,10 @@ use backend::app_server::{
 };
 use backend::events::{AppServerEvent, EventSink, TerminalOutput};
 use storage::{read_settings, read_workspaces};
-use shared::{codex_core, files_core, git_core, settings_core, workspaces_core, worktree_core};
+use shared::{
+    acp_core::AcpHost, codex_core, files_core, git_core, settings_core, workspaces_core,
+    worktree_core,
+};
 use workspace_settings::apply_workspace_settings_update;
 use types::{
     AppSettings, WorkspaceEntry, WorkspaceInfo, WorkspaceSettings, WorktreeSetupStatus,
@@ -136,6 +139,7 @@ struct DaemonState {
     storage_path: PathBuf,
     settings_path: PathBuf,
     app_settings: Mutex<AppSettings>,
+    acp_host: Mutex<AcpHost>,
     event_sink: DaemonEventSink,
     codex_login_cancels: Mutex<HashMap<String, oneshot::Sender<()>>>,
 }
@@ -168,9 +172,34 @@ impl DaemonState {
             storage_path,
             settings_path,
             app_settings: Mutex::new(app_settings),
+            acp_host: Mutex::new(AcpHost::new()),
             event_sink,
             codex_login_cancels: Mutex::new(HashMap::new()),
         }
+    }
+
+    async fn acp_start_session(
+        &self,
+        command: String,
+        args: Vec<String>,
+        env: HashMap<String, String>,
+    ) -> Result<String, String> {
+        let mut host = self.acp_host.lock().await;
+        host.start_session(command, args, env).await
+    }
+
+    async fn acp_send(
+        &self,
+        session_id: String,
+        request: Value,
+    ) -> Result<Value, String> {
+        let mut host = self.acp_host.lock().await;
+        host.send(&session_id, request).await
+    }
+
+    async fn acp_stop_session(&self, session_id: String) -> Result<(), String> {
+        let mut host = self.acp_host.lock().await;
+        host.stop_session(&session_id).await
     }
 
     async fn list_workspaces(&self) -> Vec<WorkspaceInfo> {
@@ -1502,6 +1531,18 @@ fn parse_optional_string_array(value: &Value, key: &str) -> Option<Vec<String>> 
     }
 }
 
+fn parse_optional_string_map(value: &Value, key: &str) -> Option<HashMap<String, String>> {
+    match value {
+        Value::Object(map) => map.get(key).and_then(|value| value.as_object()).map(|items| {
+            items
+                .iter()
+                .filter_map(|(k, v)| v.as_str().map(|value| (k.clone(), value.to_string())))
+                .collect::<HashMap<_, _>>()
+        }),
+        _ => None,
+    }
+}
+
 fn parse_string_array(value: &Value, key: &str) -> Result<Vec<String>, String> {
     parse_optional_string_array(value, key).ok_or_else(|| format!("missing `{key}`"))
 }
@@ -1726,6 +1767,25 @@ async fn handle_rpc_request(
                 serde_json::from_value(settings_value).map_err(|err| err.to_string())?;
             let updated = state.update_app_settings(settings).await?;
             serde_json::to_value(updated).map_err(|err| err.to_string())
+        }
+        "acp_start_session" => {
+            let command = parse_string(&params, "command")?;
+            let args = parse_optional_string_array(&params, "args").unwrap_or_default();
+            let env = parse_optional_string_map(&params, "env").unwrap_or_default();
+            let session_id = state.acp_start_session(command, args, env).await?;
+            Ok(json!({ "sessionId": session_id }))
+        }
+        "acp_send" => {
+            let session_id = parse_string(&params, "sessionId")?;
+            let request = parse_optional_value(&params, "request")
+                .ok_or_else(|| "missing `request`".to_string())?;
+            let response = state.acp_send(session_id, request).await?;
+            Ok(response)
+        }
+        "acp_stop_session" => {
+            let session_id = parse_string(&params, "sessionId")?;
+            state.acp_stop_session(session_id).await?;
+            Ok(json!({ "ok": true }))
         }
         "get_codex_config_path" => {
             let path = settings_core::get_codex_config_path_core()?;

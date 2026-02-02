@@ -874,6 +874,30 @@ export async function checkAIProviderStatus(providerId: string): Promise<boolean
   return invoke("ai_provider_status", { providerId });
 }
 
+export async function acpStartSession(options: {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+}): Promise<string> {
+  const response = await invoke<{ sessionId: string }>("acp_start_session", {
+    command: options.command,
+    args: options.args ?? [],
+    env: options.env ?? {},
+  });
+  return response.sessionId;
+}
+
+export async function acpSend(
+  sessionId: string,
+  request: unknown,
+): Promise<unknown> {
+  return invoke("acp_send", { sessionId, request });
+}
+
+export async function acpStopSession(sessionId: string): Promise<void> {
+  await invoke("acp_stop_session", { sessionId });
+}
+
 export async function streamAIGeneration(
   providerId: string,
   model: string | null,
