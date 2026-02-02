@@ -223,43 +223,61 @@ export function EditorWorkspaceSearch({
           <div className="editor-workspace-search__filters">
             <label className="editor-workspace-search__filter">
               <span>Include</span>
-              <select
-                value={includePreset}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  const preset = INCLUDE_PRESETS.find((entry) => entry.id === next);
-                  if (preset && preset.id !== "custom") {
-                    onIncludeChange(preset.value);
-                  }
-                }}
-                disabled={!showTextControls}
-              >
-                {INCLUDE_PRESETS.map((preset) => (
-                  <option key={preset.id} value={preset.id}>
-                    {preset.label}
-                  </option>
-                ))}
-              </select>
+              <div className="editor-workspace-search__filter-row">
+                <select
+                  value={includePreset}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    const preset = INCLUDE_PRESETS.find((entry) => entry.id === next);
+                    if (preset && preset.id !== "custom") {
+                      onIncludeChange(preset.value);
+                    }
+                  }}
+                  disabled={!showTextControls}
+                >
+                  {INCLUDE_PRESETS.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={includeGlobs}
+                  onChange={(event) => onIncludeChange(event.target.value)}
+                  placeholder="Custom"
+                  disabled={!showCustomInclude}
+                />
+              </div>
             </label>
             <label className="editor-workspace-search__filter">
               <span>Exclude</span>
-              <select
-                value={excludePreset}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  const preset = EXCLUDE_PRESETS.find((entry) => entry.id === next);
-                  if (preset && preset.id !== "custom") {
-                    onExcludeChange(preset.value);
-                  }
-                }}
-                disabled={!showTextControls}
-              >
-                {EXCLUDE_PRESETS.map((preset) => (
-                  <option key={preset.id} value={preset.id}>
-                    {preset.label}
-                  </option>
-                ))}
-              </select>
+              <div className="editor-workspace-search__filter-row">
+                <select
+                  value={excludePreset}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    const preset = EXCLUDE_PRESETS.find((entry) => entry.id === next);
+                    if (preset && preset.id !== "custom") {
+                      onExcludeChange(preset.value);
+                    }
+                  }}
+                  disabled={!showTextControls}
+                >
+                  {EXCLUDE_PRESETS.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={excludeGlobs}
+                  onChange={(event) => onExcludeChange(event.target.value)}
+                  placeholder="Custom"
+                  disabled={!showCustomExclude}
+                />
+              </div>
             </label>
             <label className="editor-workspace-search__filter editor-workspace-search__filter--toggle">
               <span>Include non-project</span>
@@ -267,32 +285,6 @@ export function EditorWorkspaceSearch({
             </label>
           </div>
         </div>
-        {(showCustomInclude || showCustomExclude) && (
-          <div className="editor-workspace-search__custom-row">
-            {showCustomInclude ? (
-              <label className="editor-workspace-search__custom-field">
-                <span>Include globs</span>
-                <input
-                  type="text"
-                  value={includeGlobs}
-                  onChange={(event) => onIncludeChange(event.target.value)}
-                  placeholder="src/**, apps/**"
-                />
-              </label>
-            ) : null}
-            {showCustomExclude ? (
-              <label className="editor-workspace-search__custom-field">
-                <span>Exclude globs</span>
-                <input
-                  type="text"
-                  value={excludeGlobs}
-                  onChange={(event) => onExcludeChange(event.target.value)}
-                  placeholder="node_modules/**, dist/**"
-                />
-              </label>
-            ) : null}
-          </div>
-        )}
         <div className="editor-workspace-search__summary">{summary}</div>
         <div className="editor-workspace-search__results">
           {(activeTab === "all" || activeTab === "actions") && actions.length > 0 ? (
