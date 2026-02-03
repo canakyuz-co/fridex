@@ -126,6 +126,22 @@ const EDITOR_KEYMAP_OPTIONS: Array<{
   { id: "default", label: "Monaco Default" },
 ];
 
+const FALLBACK_OTHER_AI_MODELS: Record<string, string[]> = {
+  claude: [
+    "claude-sonnet-4-5",
+    "claude-opus-4-5",
+    "claude-haiku-4-5",
+  ],
+  gemini: [
+    "gemini-3-pro-preview",
+    "gemini-3-flash-preview",
+    "gemini-2.5-pro",
+  ],
+};
+
+const getFallbackOtherAiModels = (provider: string) =>
+  FALLBACK_OTHER_AI_MODELS[provider] ?? [];
+
 const normalizeOverrideValue = (value: string): string | null => {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
@@ -1037,10 +1053,11 @@ export function SettingsView({
     const apiKey = (draft.apiKey ?? provider.apiKey ?? "").trim();
     const prefersCli = normalizedProvider.protocol === "cli";
     const useCli = (prefersCli || !apiKey) && canUseCli;
-    if (!useCli && !apiKey) {
-      pushErrorToast({
-        title: "API key required",
-        message: `Enter an API key for ${providerType} to fetch models.`,
+    const fallbackModels = getFallbackOtherAiModels(providerType);
+    if (!useCli && !apiKey && fallbackModels.length > 0) {
+      handleOtherAiDraftChange(provider.id, {
+        provider: providerType,
+        modelsText: fallbackModels.join("\n"),
       });
       return;
     }
@@ -1049,13 +1066,16 @@ export function SettingsView({
       [provider.id]: { loading: true },
     }));
     try {
-      const models = useCli
+      let models = useCli
         ? await listOtherAiModelsCli(
             providerType,
             cliCommand,
             normalizedProvider.env ?? null,
           )
         : await listOtherAiModels(providerType, apiKey);
+      if (models.length === 0 && fallbackModels.length > 0) {
+        models = fallbackModels;
+      }
       const normalizedModels = Array.from(
         new Set(
           models
@@ -1068,10 +1088,17 @@ export function SettingsView({
         modelsText: normalizedModels.join("\n"),
       });
     } catch (error) {
-      pushErrorToast({
-        title: "Couldn’t fetch models",
-        message: error instanceof Error ? error.message : String(error),
-      });
+      if (fallbackModels.length > 0) {
+        handleOtherAiDraftChange(provider.id, {
+          provider: providerType,
+          modelsText: fallbackModels.join("\n"),
+        });
+      } else {
+        pushErrorToast({
+          title: "Couldn’t fetch models",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     } finally {
       setOtherAiFetchState((prev) => ({
         ...prev,

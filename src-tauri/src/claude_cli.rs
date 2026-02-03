@@ -70,6 +70,7 @@ pub async fn send_claude_cli_message(
     command: String,
     args: Option<String>,
     prompt: String,
+    model: Option<String>,
     cwd: Option<String>,
     env: Option<HashMap<String, String>>,
     on_event: Channel<ClaudeCliEvent>,
@@ -98,6 +99,20 @@ pub async fn send_claude_cli_message(
         let parsed_args: Vec<&str> = args_str.split_whitespace().collect();
         for arg in parsed_args {
             cmd.arg(arg);
+        }
+    }
+
+    // Add model if provided and not already set by args.
+    if let Some(model) = model.as_ref().map(|value| value.trim()).filter(|value| !value.is_empty())
+    {
+        let args_str = cmd
+            .get_args()
+            .map(|value| value.to_string_lossy().to_string())
+            .collect::<Vec<String>>();
+        let has_model_flag = args_str.iter().any(|arg| arg == "--model");
+        if !has_model_flag {
+            cmd.arg("--model");
+            cmd.arg(model);
         }
     }
 

@@ -431,11 +431,13 @@ export function useThreadMessaging({
       const modelName = isOtherAiModel ? resolvedModel!.slice(colonIndex + 1) : null;
 
       if (provider && provider.protocol === "acp") {
-        const isInternalAcp =
-          provider.provider === "claude" || provider.provider === "gemini";
-        const command = isInternalAcp
-          ? `acp:${provider.provider}`
-          : provider.command?.trim();
+        const internalCommand =
+          provider.provider === "claude" || provider.provider === "gemini"
+            ? `acp:${provider.provider}`
+            : null;
+        const externalCommand = provider.command?.trim() ?? "";
+        const useInternalAcp = externalCommand.length === 0 && Boolean(internalCommand);
+        const command = externalCommand || internalCommand;
         if (!command) {
           markProcessing(threadId, false);
           pushThreadErrorMessage(
@@ -459,7 +461,13 @@ export function useThreadMessaging({
           hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
         });
 
-        const promptText = isPlanMode ? buildPlanPrompt(finalText, 0) : finalText;
+        const recentHistory = collectOtherAiHistory(
+          itemsByThread[threadId] ?? [],
+          otherAiHistoryLimit,
+        );
+        const promptText = isPlanMode
+          ? buildPlanPrompt(finalText, 0)
+          : buildOtherAiPrompt(recentHistory, finalText);
         const requestId = `acp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const request = {
           jsonrpc: "2.0",
@@ -471,14 +479,14 @@ export function useThreadMessaging({
           },
         };
         try {
-          const env = {
-            ...(provider.env ?? {}),
-            ...(provider.apiKey ? { API_KEY: provider.apiKey } : {}),
-          };
+          const env: Record<string, string> = { ...(provider.env ?? {}) };
+          if (useInternalAcp && provider.apiKey) {
+            env.API_KEY = provider.apiKey;
+          }
           const sessionId = await acpStartSession({
             command,
             args:
-              isInternalAcp || !provider.args?.trim()
+              useInternalAcp || !provider.args?.trim()
                 ? []
                 : provider.args.trim().split(/\\s+/),
             env,
@@ -640,6 +648,7 @@ export function useThreadMessaging({
             .toString(36)
             .slice(2, 8)}`;
 
+          const modelName = resolvedModel!.slice(colonIndex + 1);
           const recentHistory = collectOtherAiHistory(
             itemsByThread[threadId] ?? [],
             otherAiHistoryLimit,
@@ -655,6 +664,7 @@ export function useThreadMessaging({
               provider.command!,
               provider.args,
               promptText,
+              modelName,
               workspace.path,
               provider.env ?? null,
               {
@@ -738,7 +748,6 @@ export function useThreadMessaging({
             );
           } else {
             // Use Claude API
-            const modelName = resolvedModel!.slice(colonIndex + 1);
             if (isPlanMode) {
               let attempt = 0;
               let plan = null;
@@ -890,6 +899,7 @@ export function useThreadMessaging({
                     provider.command!,
                     provider.args ?? null,
                     promptText,
+                    modelName,
                     workspace.path,
                     provider.env ?? null,
                   )
@@ -943,6 +953,7 @@ export function useThreadMessaging({
                 provider.command!,
                 provider.args ?? null,
                 promptText,
+                modelName,
                 workspace.path,
                 provider.env ?? null,
               )

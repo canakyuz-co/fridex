@@ -875,11 +875,12 @@ fn default_other_ai_providers() -> Vec<OtherAiProvider> {
             command: Some("claude".to_string()),
             args: None,
             models: vec![
-                "claude-4.5-opus".to_string(),
-                "claude-4.5-sonnet".to_string(),
+                "claude-sonnet-4-5".to_string(),
+                "claude-opus-4-5".to_string(),
+                "claude-haiku-4-5".to_string(),
             ],
             default_model: None,
-            protocol: Some("acp".to_string()),
+            protocol: Some("cli".to_string()),
             env: None,
         },
         OtherAiProvider {
@@ -890,9 +891,13 @@ fn default_other_ai_providers() -> Vec<OtherAiProvider> {
             api_key: None,
             command: Some("gemini".to_string()),
             args: None,
-            models: Vec::new(),
+            models: vec![
+                "gemini-3-pro-preview".to_string(),
+                "gemini-3-flash-preview".to_string(),
+                "gemini-2.5-pro".to_string(),
+            ],
             default_model: None,
-            protocol: Some("acp".to_string()),
+            protocol: Some("cli".to_string()),
             env: None,
         },
     ]
