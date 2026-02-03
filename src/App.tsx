@@ -531,26 +531,6 @@ function MainApp() {
     getWorkspacePromptsDir,
     getGlobalPromptsDir,
   } = useCustomPrompts({ activeWorkspace, onDebug: addDebugEntry });
-  const { files, isLoading: isFilesLoading, refreshFilesLater } = useWorkspaceFiles({
-    activeWorkspace,
-    onDebug: addDebugEntry,
-  });
-  const editorDidSaveRef = useRef<(path: string) => void>(() => {});
-  const editorState = useEditorState({
-    workspaceId: activeWorkspaceId,
-    availablePaths: files,
-    filesReady: Boolean(activeWorkspaceId) && !isFilesLoading,
-    onDidSave: (path) => editorDidSaveRef.current(path),
-  });
-  const editorLsp = useEditorLsp({
-    workspaceId: activeWorkspaceId,
-    workspacePath: activeWorkspace?.path ?? null,
-    openPaths: editorState.openPaths,
-    buffersByPath: editorState.buffersByPath,
-  });
-  useEffect(() => {
-    editorDidSaveRef.current = editorLsp.onDidSave;
-  }, [editorLsp.onDidSave]);
   const { branches, checkoutBranch, createBranch } = useGitBranches({
     activeWorkspace,
     onDebug: addDebugEntry
@@ -1126,7 +1106,7 @@ function MainApp() {
   const showComposer = (!isCompact
     ? centerMode === "chat" || centerMode === "diff"
     : (isTablet ? tabletTab : activeTab) === "codex") && !showWorkspaceHome;
-  const { files, isLoading: isFilesLoading, setFileAutocompleteActive } =
+  const { files, isLoading: isFilesLoading, setFileAutocompleteActive, refreshFilesLater } =
     useWorkspaceFileListing({
       activeWorkspace,
       activeWorkspaceId,
@@ -1139,6 +1119,22 @@ function MainApp() {
       hasComposerSurface: showComposer || showWorkspaceHome,
       onDebug: addDebugEntry,
     });
+  const editorDidSaveRef = useRef<(path: string) => void>(() => {});
+  const editorState = useEditorState({
+    workspaceId: activeWorkspaceId,
+    availablePaths: files,
+    filesReady: Boolean(activeWorkspaceId) && !isFilesLoading,
+    onDidSave: (path) => editorDidSaveRef.current(path),
+  });
+  const editorLsp = useEditorLsp({
+    workspaceId: activeWorkspaceId,
+    workspacePath: activeWorkspace?.path ?? null,
+    openPaths: editorState.openPaths,
+    buffersByPath: editorState.buffersByPath,
+  });
+  useEffect(() => {
+    editorDidSaveRef.current = editorLsp.onDidSave;
+  }, [editorLsp.onDidSave]);
   const [usageMetric, setUsageMetric] = useState<"tokens" | "time">("tokens");
   const [usageWorkspaceId, setUsageWorkspaceId] = useState<string | null>(null);
   const usageWorkspaceOptions = useMemo(

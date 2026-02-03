@@ -3,8 +3,8 @@ import type { DebugEntry, WorkspaceInfo } from "../../../types";
 import { useWorkspaceFiles } from "../../workspaces/hooks/useWorkspaceFiles";
 
 type FilePanelMode = "git" | "files" | "prompts";
-type TabKey = "projects" | "codex" | "git" | "log";
-type TabletTabKey = "codex" | "git" | "log";
+type TabKey = "projects" | "codex" | "git" | "log" | "editor";
+type TabletTabKey = "codex" | "git" | "log" | "editor";
 
 type UseWorkspaceFileListingArgs = {
   activeWorkspace: WorkspaceInfo | null;
@@ -23,6 +23,7 @@ type UseWorkspaceFileListingResult = {
   files: string[];
   isLoading: boolean;
   setFileAutocompleteActive: (active: boolean) => void;
+  refreshFilesLater: () => void;
 };
 
 export function useWorkspaceFileListing({
@@ -58,12 +59,12 @@ export function useWorkspaceFileListing({
     }
   }, [hasComposerSurface]);
 
-  const { files, isLoading } = useWorkspaceFiles({
+  const { files, isLoading, refreshFilesLater } = useWorkspaceFiles({
     activeWorkspace,
     onDebug,
     enabled: shouldFetchFiles,
     pollingEnabled: filePanelVisible,
   });
 
-  return { files, isLoading, setFileAutocompleteActive };
+  return { files, isLoading, setFileAutocompleteActive, refreshFilesLater };
 }
