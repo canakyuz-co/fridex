@@ -8,6 +8,7 @@ import type {
   DebugEntry,
   OtherAiProvider,
   ReviewTarget,
+  ConversationItem,
   WorkspaceInfo,
 } from "../../../types";
 import {
@@ -58,6 +59,7 @@ type UseThreadMessagingOptions = {
   steerEnabled: boolean;
   customPrompts: CustomPromptOption[];
   otherAiProviders: OtherAiProvider[];
+  itemsByThread: ThreadState["itemsByThread"];
   threadStatusById: ThreadState["threadStatusById"];
   activeTurnIdByThread: ThreadState["activeTurnIdByThread"];
   rateLimitsByWorkspace: Record<string, RateLimitSnapshot | null>;
@@ -233,6 +235,64 @@ function extractAcpDelta(payload: unknown): string | null {
   return null;
 }
 
+type OtherAiHistoryEntry = { role: "user" | "assistant"; text: string };
+
+function collectOtherAiHistory(
+  items: ConversationItem[],
+  limit: number,
+): OtherAiHistoryEntry[] {
+  // Single-pass ring buffer keeps last N messages. Time O(n), space O(N).
+  if (limit <= 0) {
+    return [];
+  }
+  const buffer: OtherAiHistoryEntry[] = new Array(limit);
+  let count = 0;
+  let index = 0;
+  for (const item of items) {
+    if (item.kind !== "message") {
+      continue;
+    }
+    const text = item.text.trim();
+    if (!text) {
+      continue;
+    }
+    buffer[index] = { role: item.role, text };
+    index = (index + 1) % limit;
+    if (count < limit) {
+      count += 1;
+    }
+  }
+  const result: OtherAiHistoryEntry[] = [];
+  const start = (index - count + limit) % limit;
+  for (let offset = 0; offset < count; offset += 1) {
+    const entry = buffer[(start + offset) % limit];
+    if (entry) {
+      result.push(entry);
+    }
+  }
+  return result;
+}
+
+function buildOtherAiPrompt(
+  history: OtherAiHistoryEntry[],
+  latestText: string,
+  languageDirective: string,
+  includeLanguageDirective: boolean,
+) {
+  const historyText = history
+    .map((entry) => `${entry.role === "user" ? "User" : "Assistant"}: ${entry.text}`)
+    .join("\n\n");
+  if (!historyText) {
+    if (!includeLanguageDirective) {
+      return latestText;
+    }
+    return `${languageDirective}\n\n${latestText}`;
+  }
+  const parts = includeLanguageDirective ? [languageDirective] : [];
+  parts.push(historyText, `User: ${latestText}`);
+  return parts.join("\n\n");
+}
+
 export function useThreadMessaging({
   activeWorkspace,
   activeThreadId,
@@ -243,6 +303,7 @@ export function useThreadMessaging({
   steerEnabled,
   customPrompts,
   otherAiProviders,
+  itemsByThread,
   threadStatusById,
   activeTurnIdByThread,
   rateLimitsByWorkspace,
@@ -275,6 +336,7 @@ export function useThreadMessaging({
     ) => {
       const languageDirective =
         "Always respond in the same language as the user's most recent message.";
+      const otherAiHistoryLimit = 20;
       const messageText = text.trim();
       if (!messageText && images.length === 0) {
         return;
@@ -645,12 +707,22 @@ export function useThreadMessaging({
             .toString(36)
             .slice(2, 8)}`;
 
+          const recentHistory = collectOtherAiHistory(
+            itemsByThread[threadId] ?? [],
+            otherAiHistoryLimit,
+          );
+
           if (useCli) {
             // Use Claude CLI
             let accumulatedText = "";
             const promptText = isPlanMode
               ? buildPlanPrompt(finalText, 0)
-              : finalText;
+              : buildOtherAiPrompt(
+                  recentHistory,
+                  finalText,
+                  languageDirective,
+                  false,
+                );
             await sendClaudeCliMessage(
               provider.command!,
               provider.args,
@@ -789,9 +861,10 @@ export function useThreadMessaging({
               markProcessing(threadId, false);
               safeMessageActivity();
             } else {
-              const claudeMessages: ClaudeMessage[] = [
-                { role: "user", content: finalText },
-              ];
+              const claudeMessages: ClaudeMessage[] = recentHistory.map(
+                (entry) => ({ role: entry.role, content: entry.text }),
+              );
+              claudeMessages.push({ role: "user", content: finalText });
 
               let accumulatedText = "";
 
@@ -873,6 +946,10 @@ export function useThreadMessaging({
             .toString(36)
             .slice(2, 8)}`;
           const modelName = resolvedModel!.slice(colonIndex + 1);
+          const recentHistory = collectOtherAiHistory(
+            itemsByThread[threadId] ?? [],
+            otherAiHistoryLimit,
+          );
 
           if (isPlanMode) {
             let attempt = 0;
@@ -930,7 +1007,12 @@ export function useThreadMessaging({
 
           const promptText = isPlanMode
             ? buildPlanPrompt(finalText, 0)
-            : `${languageDirective}\n\n${finalText}`;
+            : buildOtherAiPrompt(
+                recentHistory,
+                finalText,
+                languageDirective,
+                true,
+              );
           const response = useCli
             ? await sendGeminiCliMessageSync(
                 provider.command!,
@@ -1028,6 +1110,7 @@ export function useThreadMessaging({
       dispatch,
       effort,
       getCustomName,
+      itemsByThread,
       markProcessing,
       model,
       onClaudeRateLimits,
