@@ -159,10 +159,15 @@ fn run_cli_with_env(
 ) -> Result<String, String> {
     let mut cmd = Command::new(command);
     cmd.args(args);
+    let mut has_path_override = false;
     if let Some(env_map) = env {
+        has_path_override = env_map.contains_key("PATH");
         for (key, value) in env_map {
             cmd.env(key, value);
         }
+    }
+    if !has_path_override {
+        cmd.env("PATH", crate::utils::git_env_path());
     }
     let output = cmd.output().map_err(|err| format!("CLI spawn failed: {err}"))?;
     if !output.status.success() {

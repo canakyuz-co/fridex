@@ -2105,6 +2105,9 @@ async fn handle_client(
 }
 
 fn main() {
+    if let Err(err) = fix_path_env::fix() {
+        eprintln!("Failed to sync PATH from shell: {err}");
+    }
     let config = match parse_args() {
         Ok(config) => config,
         Err(err) => {

@@ -46,10 +46,16 @@ pub async fn send_gemini_cli_message_sync(
         if let Some(dir) = cwd {
             cmd.current_dir(dir);
         }
+        let mut has_path_override = false;
         if let Some(env_map) = env {
+            has_path_override = env_map.contains_key("PATH");
             for (key, value) in env_map {
                 cmd.env(key, value);
             }
+        }
+        if !has_path_override {
+            // macOS GUI apps often start with a minimal PATH; include common brew/system locations.
+            cmd.env("PATH", crate::utils::git_env_path());
         }
         cmd.stdin(Stdio::null());
         cmd.stdout(Stdio::piped());
