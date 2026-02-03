@@ -2,6 +2,7 @@ import { useCallback, useReducer, useRef } from "react";
 import * as Sentry from "@sentry/react";
 import type { CustomPromptOption, DebugEntry, OtherAiProvider, WorkspaceInfo } from "../../../types";
 import type { ClaudeRateLimits, ClaudeUsage } from "../../../services/tauri";
+import { speakText } from "../../../services/tauri";
 import { useAppServerEvents } from "../../app/hooks/useAppServerEvents";
 import { initialState, threadReducer } from "./useThreadsReducer";
 import { useThreadStorage } from "./useThreadStorage";
@@ -31,6 +32,8 @@ type UseThreadsOptions = {
   onMessageActivity?: () => void;
   onClaudeRateLimits?: (limits: ClaudeRateLimits) => void;
   onClaudeUsage?: (usage: ClaudeUsage) => void;
+  ttsEnabled?: boolean;
+  ttsVoice?: string | null;
 };
 
 export function useThreads({
@@ -47,6 +50,8 @@ export function useThreads({
   onMessageActivity,
   onClaudeRateLimits,
   onClaudeUsage,
+  ttsEnabled = false,
+  ttsVoice = null,
 }: UseThreadsOptions) {
   const [state, dispatch] = useReducer(threadReducer, initialState);
   const loadedThreadsRef = useRef<Record<string, boolean>>({});
@@ -133,6 +138,26 @@ export function useThreads({
       Boolean(state.hiddenThreadIdsByWorkspace[workspaceId]?.[threadId]),
     [state.hiddenThreadIdsByWorkspace],
   );
+  const handleAssistantSpeak = useCallback(
+    (_workspaceId: string, threadId: string, text: string) => {
+      if (!ttsEnabled) {
+        return;
+      }
+      if (threadId !== activeThreadId) {
+        return;
+      }
+      const trimmed = text.trim();
+      if (!trimmed) {
+        return;
+      }
+      const maxLength = 1000;
+      const clipped = trimmed.length > maxLength ? `${trimmed.slice(0, maxLength)}…` : trimmed;
+      void speakText(clipped, ttsVoice).catch(() => {
+        // Ignore TTS errors to avoid breaking message flow.
+      });
+    },
+    [activeThreadId, ttsEnabled, ttsVoice],
+  );
 
   const handlers = useThreadEventHandlers({
     activeThreadId,
@@ -150,6 +175,7 @@ export function useThreads({
     applyCollabThreadLinks,
     approvalAllowlistRef,
     pendingInterruptsRef,
+    onAssistantMessageCompleted: handleAssistantSpeak,
   });
 
   useAppServerEvents(handlers);
@@ -284,6 +310,7 @@ export function useThreads({
     onDebug,
     onClaudeRateLimits,
     onClaudeUsage,
+    onAssistantMessageCompleted: handleAssistantSpeak,
     pushThreadErrorMessage,
     ensureThreadForActiveWorkspace,
     ensureThreadForWorkspace,

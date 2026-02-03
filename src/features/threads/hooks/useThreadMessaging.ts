@@ -76,6 +76,11 @@ type UseThreadMessagingOptions = {
   onDebug?: (entry: DebugEntry) => void;
   onClaudeRateLimits?: (limits: ClaudeRateLimits) => void;
   onClaudeUsage?: (usage: ClaudeUsage) => void;
+  onAssistantMessageCompleted?: (
+    workspaceId: string,
+    threadId: string,
+    text: string,
+  ) => void;
   pushThreadErrorMessage: (threadId: string, message: string) => void;
   ensureThreadForActiveWorkspace: () => Promise<string | null>;
   ensureThreadForWorkspace: (workspaceId: string) => Promise<string | null>;
@@ -250,6 +255,7 @@ export function useThreadMessaging({
   onDebug,
   onClaudeRateLimits,
   onClaudeUsage,
+  onAssistantMessageCompleted,
   pushThreadErrorMessage,
   ensureThreadForActiveWorkspace,
   ensureThreadForWorkspace,
@@ -265,6 +271,8 @@ export function useThreadMessaging({
       images: string[] = [],
       options?: SendMessageOptions,
     ) => {
+      const languageDirective =
+        "Always respond in the same language as the user's most recent message.";
       const messageText = text.trim();
       if (!messageText && images.length === 0) {
         return;
@@ -302,6 +310,33 @@ export function useThreadMessaging({
         "settings" in resolvedCollaborationMode
           ? resolvedCollaborationMode
           : null;
+      const languageAwareCollaborationMode = sanitizedCollaborationMode
+        ? (() => {
+            const rawSettings =
+              "settings" in sanitizedCollaborationMode
+                ? (sanitizedCollaborationMode.settings as Record<string, unknown>)
+                : {};
+            const existingInstructions =
+              typeof rawSettings.developer_instructions === "string"
+                ? rawSettings.developer_instructions.trim()
+                : "";
+            const hasLanguageDirective = existingInstructions
+              .toLowerCase()
+              .includes("same language");
+            const mergedInstructions = hasLanguageDirective
+              ? existingInstructions
+              : existingInstructions
+                ? `${existingInstructions}\n\n${languageDirective}`
+                : languageDirective;
+            return {
+              ...sanitizedCollaborationMode,
+              settings: {
+                ...rawSettings,
+                developer_instructions: mergedInstructions,
+              },
+            };
+          })()
+        : null;
       const resolvedAccessMode =
         options?.accessMode !== undefined ? options.accessMode : accessMode;
 
@@ -371,7 +406,7 @@ export function useThreadMessaging({
       const provider = providerId ? otherAiProviders.find((p) => p.id === providerId) : null;
       const modelName = isOtherAiModel ? resolvedModel!.slice(colonIndex + 1) : null;
 
-      if (provider && provider.protocol === "acp") {
+        if (provider && provider.protocol === "acp") {
         const command = provider.command?.trim();
         if (!command) {
           markProcessing(threadId, false);
@@ -396,7 +431,9 @@ export function useThreadMessaging({
           hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
         });
 
-        const promptText = isPlanMode ? buildPlanPrompt(finalText, 0) : finalText;
+        const promptText = isPlanMode
+          ? buildPlanPrompt(finalText, 0)
+          : `${languageDirective}\n\n${finalText}`;
         const requestId = `acp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const request = {
           jsonrpc: "2.0",
@@ -513,6 +550,7 @@ export function useThreadMessaging({
               },
               hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
             });
+            onAssistantMessageCompleted?.(workspace.id, threadId, responseText);
           }
           markProcessing(threadId, false);
           safeMessageActivity();
@@ -853,17 +891,20 @@ export function useThreadMessaging({
             return;
           }
 
+          const promptText = isPlanMode
+            ? buildPlanPrompt(finalText, 0)
+            : `${languageDirective}\n\n${finalText}`;
           const response = useCli
             ? await sendGeminiCliMessageSync(
                 provider.command!,
                 provider.args ?? null,
-                finalText,
+                promptText,
                 workspace.path,
               )
             : await sendGeminiMessageSync(
                 provider.apiKey!,
                 modelName,
-                finalText,
+                promptText,
               );
           dispatch({
             type: "upsertItem",
@@ -877,6 +918,7 @@ export function useThreadMessaging({
             },
             hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
           });
+          onAssistantMessageCompleted?.(workspace.id, threadId, response.content);
           markProcessing(threadId, false);
           safeMessageActivity();
           return;
@@ -891,7 +933,7 @@ export function useThreadMessaging({
             {
               model: resolvedModel,
               effort: resolvedEffort,
-              collaborationMode: sanitizedCollaborationMode,
+              collaborationMode: languageAwareCollaborationMode,
               accessMode: resolvedAccessMode,
               images,
             },
@@ -953,6 +995,7 @@ export function useThreadMessaging({
       model,
       onClaudeRateLimits,
       onClaudeUsage,
+      onAssistantMessageCompleted,
       onDebug,
       otherAiProviders,
       pushThreadErrorMessage,

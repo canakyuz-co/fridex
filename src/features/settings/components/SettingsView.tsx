@@ -31,7 +31,7 @@ import {
   getDefaultInterruptShortcut,
 } from "../../../utils/shortcuts";
 import { clampUiScale } from "../../../utils/uiScale";
-import { getCodexConfigPath, listOtherAiModels } from "../../../services/tauri";
+import { getCodexConfigPath, listOtherAiModels, speakText } from "../../../services/tauri";
 import { pushErrorToast } from "../../../services/toasts";
 import {
   CODE_FONT_FAMILY_OPTIONS,
@@ -2285,7 +2285,7 @@ export function SettingsView({
                     <option value="zh">Chinese</option>
                   </select>
                   <div className="settings-help">
-                    Auto-detect stays on; this nudges the decoder toward your preference.
+                    Select a language to force transcription, or leave empty for auto-detect.
                   </div>
                 </div>
                 <div className="settings-field">
@@ -2311,6 +2311,70 @@ export function SettingsView({
                   </select>
                   <div className="settings-help">
                     Hold the key to start dictation, release to stop and process.
+                  </div>
+                </div>
+                <div className="settings-subsection-title">Speech</div>
+                <div className="settings-subsection-subtitle">
+                  Speak assistant responses aloud.
+                </div>
+                <div className="settings-toggle-row">
+                  <div>
+                    <div className="settings-toggle-title">Enable voice replies</div>
+                    <div className="settings-toggle-subtitle">
+                      Uses macOS system voices via the built-in speech engine.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={`settings-toggle ${appSettings.ttsEnabled ? "on" : ""}`}
+                    onClick={() =>
+                      void onUpdateAppSettings({
+                        ...appSettings,
+                        ttsEnabled: !appSettings.ttsEnabled,
+                      })
+                    }
+                    aria-pressed={appSettings.ttsEnabled}
+                  >
+                    <span className="settings-toggle-knob" />
+                  </button>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label" htmlFor="tts-voice">
+                    Voice (optional)
+                  </label>
+                  <div className="settings-field-row">
+                    <input
+                      id="tts-voice"
+                      className="settings-input"
+                      value={appSettings.ttsVoice ?? ""}
+                      onChange={(event) =>
+                        void onUpdateAppSettings({
+                          ...appSettings,
+                          ttsVoice: event.target.value || null,
+                        })
+                      }
+                      placeholder="Samantha"
+                    />
+                    <button
+                      type="button"
+                      className="ghost settings-button-compact"
+                      onClick={() =>
+                        void speakText(
+                          "Friday online. Voice check complete.",
+                          appSettings.ttsVoice,
+                        ).catch(() => {
+                          pushErrorToast({
+                            title: "Voice preview failed",
+                            message: "Unable to play the preview voice.",
+                          });
+                        })
+                      }
+                    >
+                      Preview
+                    </button>
+                  </div>
+                  <div className="settings-help">
+                    Leave empty to use the system default voice.
                   </div>
                 </div>
                 {dictationModelStatus && (

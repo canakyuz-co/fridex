@@ -412,6 +412,121 @@
   -webkit-app-region: no-drag;
 }
 
+.main-topbar-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+  -webkit-app-region: drag;
+}
+
+.friday-aura {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  opacity: 0.92;
+}
+
+.friday-aura-shell {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 120deg,
+    rgba(120, 200, 255, 0.1),
+    rgba(120, 200, 255, 0.5),
+    rgba(140, 150, 255, 0.2),
+    rgba(120, 200, 255, 0.35)
+  );
+  filter: blur(0.2px);
+  animation: friday-aura-rotate 7.5s linear infinite;
+}
+
+.friday-aura-ring {
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  border: 1px solid rgba(140, 210, 255, 0.35);
+  box-shadow: inset 0 0 8px rgba(120, 200, 255, 0.2);
+}
+
+.friday-aura-core {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(210, 240, 255, 0.95),
+    rgba(120, 200, 255, 0.55)
+  );
+  box-shadow:
+    0 0 10px rgba(120, 200, 255, 0.8),
+    0 0 18px rgba(120, 200, 255, 0.35);
+  animation: friday-aura-core 2.8s ease-in-out infinite;
+}
+
+.friday-aura-sweep {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    rgba(150, 220, 255, 0.3),
+    transparent 35%
+  );
+  mix-blend-mode: screen;
+  opacity: 0.65;
+  animation: friday-aura-rotate 5.5s linear infinite;
+}
+
+@keyframes friday-aura-core {
+  0%,
+  100% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+@keyframes friday-aura-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .friday-aura-shell,
+  .friday-aura-ring,
+  .friday-aura-core,
+  .friday-aura-sweep {
+    animation: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .main-topbar-center {
+    display: none;
+  }
+}
+
 .topbar-leading {
   display: flex;
   align-items: center;

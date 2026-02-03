@@ -327,6 +327,10 @@ export async function rememberApprovalRule(
   return invoke("remember_approval_rule", { workspaceId, command });
 }
 
+export async function speakText(text: string, voice?: string | null) {
+  return invoke("tts_speak", { text, voice: voice ?? null });
+}
+
 export async function getGitStatus(workspace_id: string): Promise<{
   branchName: string;
   files: GitFileStatus[];

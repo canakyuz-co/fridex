@@ -758,6 +758,11 @@ pub(crate) async fn dictation_start(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<DictationSessionState, String> {
+    let preferred_language = preferred_language
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && value.to_ascii_lowercase() != "auto")
+        .map(|value| value.to_string());
     let model_id = resolve_model_id(&state, None).await;
     let model_status = refresh_status(&app, &state, &model_id).await;
     if model_status.state != DictationModelState::Ready {
@@ -796,7 +801,7 @@ pub(crate) async fn dictation_start(
     let (ready_tx, ready_rx) = oneshot::channel();
     let (stopped_tx, stopped_rx) = oneshot::channel();
     let app_handle = app.clone();
-    let preferred_clone = preferred_language.clone();
+        let preferred_clone = preferred_language.clone();
     let audio_capture = audio.clone();
 
     std::thread::spawn(move || {
@@ -1001,9 +1006,15 @@ pub(crate) async fn dictation_stop(
         match outcome {
             Ok(text) => {
                 if !text.trim().is_empty() {
+                    emit_event(&app_handle, DictationEvent::Transcript { text });
+                } else {
                     emit_event(
                         &app_handle,
-                        DictationEvent::Transcript { text },
+                        DictationEvent::Canceled {
+                            message:
+                                "No speech detected. Try speaking closer or for longer."
+                                    .to_string(),
+                        },
                     );
                 }
             }
@@ -1374,28 +1385,14 @@ fn transcribe_audio(
     params.set_single_segment(false);
     let mut forced_language: Option<String> = None;
     if let Some(preferred) = preferred_language.clone() {
-        if let Some(pref_id) = get_lang_id(&preferred) {
-            if state.pcm_to_mel(&audio, threads).is_ok() {
-                if let Ok((_detected, probs)) = state.lang_detect(0, threads) {
-                    let pref_index = pref_id.max(0) as usize;
-                    let pref_prob = probs.get(pref_index).copied().unwrap_or(0.0);
-                    let best_prob = probs
-                        .iter()
-                        .copied()
-                        .fold(0.0_f32, |acc, value| acc.max(value));
-                    if best_prob > 0.0 && (best_prob - pref_prob) <= 0.30 {
-                        forced_language = Some(preferred);
-                    }
-                }
-            }
+        if get_lang_id(&preferred).is_some() {
+            forced_language = Some(preferred);
         }
     }
 
     if let Some(language) = forced_language.as_deref() {
-        // Use the preferred language only when detection is ambiguous.
         params.set_language(Some(language));
     } else {
-        // Auto-detect language while still running transcription.
         params.set_language(Some("auto"));
     }
     params.set_n_threads(threads as i32);

@@ -502,6 +502,10 @@ pub(crate) struct AppSettings {
         rename = "dictationHoldKey"
     )]
     pub(crate) dictation_hold_key: String,
+    #[serde(default = "default_tts_enabled", rename = "ttsEnabled")]
+    pub(crate) tts_enabled: bool,
+    #[serde(default, rename = "ttsVoice")]
+    pub(crate) tts_voice: Option<String>,
     #[serde(default = "default_composer_editor_preset", rename = "composerEditorPreset")]
     pub(crate) composer_editor_preset: String,
     #[serde(default = "default_composer_fence_expand_on_space", rename = "composerFenceExpandOnSpace")]
@@ -734,6 +738,10 @@ fn default_dictation_hold_key() -> String {
     "alt".to_string()
 }
 
+fn default_tts_enabled() -> bool {
+    false
+}
+
 fn default_composer_editor_preset() -> String {
     "default".to_string()
 }
@@ -912,6 +920,8 @@ impl Default for AppSettings {
             dictation_model_id: default_dictation_model_id(),
             dictation_preferred_language: None,
             dictation_hold_key: default_dictation_hold_key(),
+            tts_enabled: default_tts_enabled(),
+            tts_voice: None,
             composer_editor_preset: default_composer_editor_preset(),
             composer_fence_expand_on_space: default_composer_fence_expand_on_space(),
             composer_fence_expand_on_enter: default_composer_fence_expand_on_enter(),

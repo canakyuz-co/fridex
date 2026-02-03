@@ -771,6 +771,8 @@ function MainApp() {
     otherAiProviders: appSettings.otherAiProviders,
     onMessageActivity: queueGitStatusRefresh,
     onClaudeUsage: handleClaudeUsage,
+    ttsEnabled: appSettings.ttsEnabled,
+    ttsVoice: appSettings.ttsVoice,
   });
   const {
     activeAccount,
@@ -1726,6 +1728,7 @@ function MainApp() {
     homeNode,
     mainHeaderNode,
     desktopTopbarLeftNode,
+    desktopTopbarCenterNode,
     tabletNavNode,
     tabBarNode,
     gitDiffPanelNode,
@@ -2297,6 +2300,7 @@ function MainApp() {
         homeNode={homeNode}
         mainHeaderNode={mainHeaderNode}
         desktopTopbarLeftNode={desktopTopbarLeftNodeWithToggle}
+        desktopTopbarCenterNode={desktopTopbarCenterNode}
         tabletNavNode={tabletNavNode}
         tabBarNode={tabBarNode}
         gitDiffPanelNode={gitDiffPanelNode}
