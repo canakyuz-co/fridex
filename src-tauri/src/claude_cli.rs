@@ -132,7 +132,7 @@ pub async fn send_claude_cli_message(
     }
     if !has_path_override {
         // macOS GUI apps often start with a minimal PATH; include common brew/system locations.
-        cmd.env("PATH", crate::utils::git_env_path());
+        cmd.env("PATH", crate::utils::tools_env_path());
     }
 
     // Setup stdio

@@ -55,7 +55,7 @@ pub async fn send_gemini_cli_message_sync(
         }
         if !has_path_override {
             // macOS GUI apps often start with a minimal PATH; include common brew/system locations.
-            cmd.env("PATH", crate::utils::git_env_path());
+            cmd.env("PATH", crate::utils::tools_env_path());
         }
         cmd.stdin(Stdio::null());
         cmd.stdout(Stdio::piped());

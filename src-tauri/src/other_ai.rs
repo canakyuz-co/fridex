@@ -167,7 +167,7 @@ fn run_cli_with_env(
         }
     }
     if !has_path_override {
-        cmd.env("PATH", crate::utils::git_env_path());
+        cmd.env("PATH", crate::utils::tools_env_path());
     }
     let output = cmd.output().map_err(|err| format!("CLI spawn failed: {err}"))?;
     if !output.status.success() {
