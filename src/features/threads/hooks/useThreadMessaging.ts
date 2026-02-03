@@ -728,6 +728,7 @@ export function useThreadMessaging({
               provider.args,
               promptText,
               workspace.path,
+              provider.env ?? null,
               {
                 onInit: (sessionId, model) => {
                   onDebug?.({
@@ -962,6 +963,7 @@ export function useThreadMessaging({
                     provider.args ?? null,
                     promptText,
                     workspace.path,
+                    provider.env ?? null,
                   )
                 : await sendGeminiMessageSync(
                     provider.apiKey!,
@@ -1019,6 +1021,7 @@ export function useThreadMessaging({
                 provider.args ?? null,
                 promptText,
                 workspace.path,
+                provider.env ?? null,
               )
             : await sendGeminiMessageSync(
                 provider.apiKey!,

@@ -3962,7 +3962,8 @@ export function SettingsView({
                         />
                       </div>
                       <div className="settings-help">
-                        CLI args are passed before the prompt. Keep output set to stream JSON.
+                        Use {"{prompt}"} to inject the prompt into args; otherwise the prompt is sent
+                        via stdin. Keep Claude CLI output set to stream JSON.
                       </div>
                       <label className="settings-field-label">Protocol</label>
                       <select

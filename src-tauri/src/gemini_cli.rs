@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -14,6 +15,7 @@ pub async fn send_gemini_cli_message_sync(
     args: Option<String>,
     prompt: String,
     cwd: Option<String>,
+    env: Option<HashMap<String, String>>,
 ) -> Result<GeminiCliResponse, String> {
     let command = command.trim();
     if command.is_empty() {
@@ -41,6 +43,11 @@ pub async fn send_gemini_cli_message_sync(
 
     if let Some(dir) = cwd {
         cmd.current_dir(dir);
+    }
+    if let Some(env_map) = env {
+        for (key, value) in env_map {
+            cmd.env(key, value);
+        }
     }
 
     if !used_placeholder {

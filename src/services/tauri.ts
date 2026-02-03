@@ -1053,12 +1053,14 @@ export async function sendGeminiCliMessageSync(
   args: string | null,
   prompt: string,
   cwd: string | null,
+  env?: Record<string, string> | null,
 ): Promise<GeminiCliResponse> {
   return invoke<GeminiCliResponse>("send_gemini_cli_message_sync", {
     command,
     args,
     prompt,
     cwd,
+    env,
   });
 }
 
@@ -1092,6 +1094,7 @@ export async function sendClaudeCliMessage(
   args: string | null,
   prompt: string,
   cwd: string | null,
+  env: Record<string, string> | null,
   handlers: ClaudeCliEventHandler,
 ): Promise<void> {
   const channel = new Channel<ClaudeCliEvent>();
@@ -1126,6 +1129,7 @@ export async function sendClaudeCliMessage(
     args,
     prompt,
     cwd,
+    env,
     onEvent: channel,
   });
 }

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use tauri::ipc::Channel;
@@ -70,6 +71,7 @@ pub async fn send_claude_cli_message(
     args: Option<String>,
     prompt: String,
     cwd: Option<String>,
+    env: Option<HashMap<String, String>>,
     on_event: Channel<ClaudeCliEvent>,
 ) -> Result<(), String> {
     let command = command.trim();
@@ -105,6 +107,11 @@ pub async fn send_claude_cli_message(
     // Set working directory
     if let Some(dir) = cwd {
         cmd.current_dir(dir);
+    }
+    if let Some(env_map) = env {
+        for (key, value) in env_map {
+            cmd.env(key, value);
+        }
     }
 
     // Setup stdio
