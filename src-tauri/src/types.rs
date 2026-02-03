@@ -502,13 +502,6 @@ pub(crate) struct AppSettings {
         rename = "dictationHoldKey"
     )]
     pub(crate) dictation_hold_key: String,
-    #[serde(
-        default = "default_voice_assistant_model_id",
-        rename = "voiceAssistantModelId"
-    )]
-    pub(crate) voice_assistant_model_id: String,
-    #[serde(default, rename = "voiceAssistantPreferredLanguage")]
-    pub(crate) voice_assistant_preferred_language: Option<String>,
     #[serde(default = "default_tts_enabled", rename = "ttsEnabled")]
     pub(crate) tts_enabled: bool,
     #[serde(default, rename = "ttsVoice")]
@@ -745,10 +738,6 @@ fn default_dictation_hold_key() -> String {
     "alt".to_string()
 }
 
-fn default_voice_assistant_model_id() -> String {
-    "base".to_string()
-}
-
 fn default_tts_enabled() -> bool {
     false
 }
@@ -931,8 +920,6 @@ impl Default for AppSettings {
             dictation_model_id: default_dictation_model_id(),
             dictation_preferred_language: None,
             dictation_hold_key: default_dictation_hold_key(),
-            voice_assistant_model_id: default_voice_assistant_model_id(),
-            voice_assistant_preferred_language: None,
             tts_enabled: default_tts_enabled(),
             tts_voice: None,
             composer_editor_preset: default_composer_editor_preset(),
@@ -1034,8 +1021,6 @@ mod tests {
         assert_eq!(settings.dictation_model_id, "base");
         assert!(settings.dictation_preferred_language.is_none());
         assert_eq!(settings.dictation_hold_key, "alt");
-        assert_eq!(settings.voice_assistant_model_id, "base");
-        assert!(settings.voice_assistant_preferred_language.is_none());
         assert_eq!(settings.composer_editor_preset, "default");
         assert!(!settings.composer_fence_expand_on_space);
         assert!(!settings.composer_fence_expand_on_enter);

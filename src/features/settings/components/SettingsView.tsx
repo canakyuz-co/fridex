@@ -6,7 +6,6 @@ import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import LayoutGrid from "lucide-react/dist/esm/icons/layout-grid";
 import SlidersHorizontal from "lucide-react/dist/esm/icons/sliders-horizontal";
 import Mic from "lucide-react/dist/esm/icons/mic";
-import Sparkles from "lucide-react/dist/esm/icons/sparkles";
 import Keyboard from "lucide-react/dist/esm/icons/keyboard";
 import Stethoscope from "lucide-react/dist/esm/icons/stethoscope";
 import GitBranch from "lucide-react/dist/esm/icons/git-branch";
@@ -280,10 +279,6 @@ export type SettingsViewProps = {
   onDownloadDictationModel?: () => void;
   onCancelDictationDownload?: () => void;
   onRemoveDictationModel?: () => void;
-  voiceAssistantModelStatus?: DictationModelStatus | null;
-  onDownloadVoiceAssistantModel?: () => void;
-  onCancelVoiceAssistantDownload?: () => void;
-  onRemoveVoiceAssistantModel?: () => void;
   initialSection?: CodexSection;
 };
 
@@ -291,7 +286,6 @@ type SettingsSection =
   | "projects"
   | "display"
   | "composer"
-  | "voice-assistant"
   | "dictation"
   | "shortcuts"
   | "open-apps"
@@ -397,10 +391,6 @@ export function SettingsView({
   onDownloadDictationModel,
   onCancelDictationDownload,
   onRemoveDictationModel,
-  voiceAssistantModelStatus,
-  onDownloadVoiceAssistantModel,
-  onCancelVoiceAssistantDownload,
-  onRemoveVoiceAssistantModel,
   initialSection,
 }: SettingsViewProps) {
   const [activeSection, setActiveSection] = useState<CodexSection>("projects");
@@ -490,8 +480,6 @@ export function SettingsView({
   });
   const dictationReady = dictationModelStatus?.state === "ready";
   const dictationProgress = dictationModelStatus?.progress ?? null;
-  const voiceAssistantReady = voiceAssistantModelStatus?.state === "ready";
-  const voiceAssistantProgress = voiceAssistantModelStatus?.progress ?? null;
   const globalAgentsStatus = globalAgentsLoading
     ? "Loading…"
     : globalAgentsSaving
@@ -535,13 +523,6 @@ export function SettingsView({
       ) ?? DICTATION_MODELS[1]
     );
   }, [appSettings.dictationModelId]);
-  const selectedVoiceAssistantModel = useMemo(() => {
-    return (
-      DICTATION_MODELS.find(
-        (model) => model.id === appSettings.voiceAssistantModelId,
-      ) ?? DICTATION_MODELS[1]
-    );
-  }, [appSettings.voiceAssistantModelId]);
 
   const projects = useMemo(
     () => groupedWorkspaces.flatMap((group) => group.workspaces),
@@ -1364,14 +1345,6 @@ export function SettingsView({
             >
               <FileText aria-hidden />
               Composer
-            </button>
-            <button
-              type="button"
-              className={`settings-nav ${activeSection === "voice-assistant" ? "active" : ""}`}
-              onClick={() => setActiveSection("voice-assistant")}
-            >
-              <Sparkles aria-hidden />
-              Voice Assistant
             </button>
             <button
               type="button"
@@ -2225,219 +2198,11 @@ export function SettingsView({
                 </div>
               </section>
             )}
-            {activeSection === "voice-assistant" && (
-              <section className="settings-section">
-                <div className="settings-section-title">Voice Assistant</div>
-                <div className="settings-section-subtitle">
-                  Friday listens only when you click the microphone in the top bar.
-                </div>
-                <div className="settings-field">
-                  <label className="settings-field-label" htmlFor="voice-assistant-model">
-                    Voice assistant model
-                  </label>
-                  <select
-                    id="voice-assistant-model"
-                    className="settings-select"
-                    value={appSettings.voiceAssistantModelId}
-                    onChange={(event) =>
-                      void onUpdateAppSettings({
-                        ...appSettings,
-                        voiceAssistantModelId: event.target.value,
-                      })
-                    }
-                  >
-                    {DICTATION_MODELS.map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {model.label} ({model.size})
-                      </option>
-                    ))}
-                  </select>
-                  <div className="settings-help">
-                    {selectedVoiceAssistantModel.note} Download size:{" "}
-                    {selectedVoiceAssistantModel.size}.
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <label className="settings-field-label" htmlFor="voice-assistant-language">
-                    Preferred listening language
-                  </label>
-                  <select
-                    id="voice-assistant-language"
-                    className="settings-select"
-                    value={appSettings.voiceAssistantPreferredLanguage ?? ""}
-                    onChange={(event) =>
-                      void onUpdateAppSettings({
-                        ...appSettings,
-                        voiceAssistantPreferredLanguage: event.target.value || null,
-                      })
-                    }
-                  >
-                    <option value="">Auto-detect only</option>
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option>
-                    <option value="fr">French</option>
-                    <option value="de">German</option>
-                    <option value="it">Italian</option>
-                    <option value="pt">Portuguese</option>
-                    <option value="nl">Dutch</option>
-                    <option value="sv">Swedish</option>
-                    <option value="no">Norwegian</option>
-                    <option value="da">Danish</option>
-                    <option value="fi">Finnish</option>
-                    <option value="pl">Polish</option>
-                    <option value="tr">Turkish</option>
-                    <option value="ru">Russian</option>
-                    <option value="uk">Ukrainian</option>
-                    <option value="ja">Japanese</option>
-                    <option value="ko">Korean</option>
-                    <option value="zh">Chinese</option>
-                  </select>
-                  <div className="settings-help">
-                    Select a language to force transcription, or leave empty for auto-detect.
-                  </div>
-                </div>
-                <div className="settings-subsection-title">Speech</div>
-                <div className="settings-subsection-subtitle">
-                  Speak assistant responses aloud.
-                </div>
-                <div className="settings-toggle-row">
-                  <div>
-                    <div className="settings-toggle-title">Enable voice replies</div>
-                    <div className="settings-toggle-subtitle">
-                      Uses macOS system voices via the built-in speech engine.
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className={`settings-toggle ${appSettings.ttsEnabled ? "on" : ""}`}
-                    onClick={() =>
-                      void onUpdateAppSettings({
-                        ...appSettings,
-                        ttsEnabled: !appSettings.ttsEnabled,
-                      })
-                    }
-                    aria-pressed={appSettings.ttsEnabled}
-                  >
-                    <span className="settings-toggle-knob" />
-                  </button>
-                </div>
-                <div className="settings-field">
-                  <label className="settings-field-label" htmlFor="tts-voice">
-                    Voice (optional)
-                  </label>
-                  <div className="settings-field-row">
-                    <input
-                      id="tts-voice"
-                      className="settings-input"
-                      value={appSettings.ttsVoice ?? ""}
-                      onChange={(event) =>
-                        void onUpdateAppSettings({
-                          ...appSettings,
-                          ttsVoice: event.target.value || null,
-                        })
-                      }
-                      placeholder="Samantha"
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() =>
-                        void speakText(
-                          "Friday online. Voice check complete.",
-                          appSettings.ttsVoice,
-                        ).catch(() => {
-                          pushErrorToast({
-                            title: "Voice preview failed",
-                            message: "Unable to play the preview voice.",
-                          });
-                        })
-                      }
-                    >
-                      Preview
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    Leave empty to use the system default voice.
-                  </div>
-                </div>
-                {voiceAssistantModelStatus && (
-                  <div className="settings-field">
-                    <div className="settings-field-label">
-                      Model status ({selectedVoiceAssistantModel.label})
-                    </div>
-                    <div className="settings-help">
-                      {voiceAssistantModelStatus.state === "ready" &&
-                        "Ready for the voice assistant."}
-                      {voiceAssistantModelStatus.state === "missing" &&
-                        "Model not downloaded yet."}
-                      {voiceAssistantModelStatus.state === "downloading" &&
-                        "Downloading model..."}
-                      {voiceAssistantModelStatus.state === "error" &&
-                        (voiceAssistantModelStatus.error ?? "Download error.")}
-                    </div>
-                    {voiceAssistantProgress && (
-                      <div className="settings-download-progress">
-                        <div className="settings-download-bar">
-                          <div
-                            className="settings-download-fill"
-                            style={{
-                              width: voiceAssistantProgress.totalBytes
-                                ? `${Math.min(
-                                    100,
-                                    (voiceAssistantProgress.downloadedBytes /
-                                      voiceAssistantProgress.totalBytes) *
-                                      100,
-                                  )}%`
-                                : "0%",
-                            }}
-                          />
-                        </div>
-                        <div className="settings-download-meta">
-                          {formatDownloadSize(voiceAssistantProgress.downloadedBytes)}
-                        </div>
-                      </div>
-                    )}
-                    <div className="settings-field-actions">
-                      {voiceAssistantModelStatus.state === "missing" && (
-                        <button
-                          type="button"
-                          className="primary"
-                          onClick={onDownloadVoiceAssistantModel}
-                          disabled={!onDownloadVoiceAssistantModel}
-                        >
-                          Download model
-                        </button>
-                      )}
-                      {voiceAssistantModelStatus.state === "downloading" && (
-                        <button
-                          type="button"
-                          className="ghost settings-button-compact"
-                          onClick={onCancelVoiceAssistantDownload}
-                          disabled={!onCancelVoiceAssistantDownload}
-                        >
-                          Cancel download
-                        </button>
-                      )}
-                      {voiceAssistantReady && (
-                        <button
-                          type="button"
-                          className="ghost settings-button-compact"
-                          onClick={onRemoveVoiceAssistantModel}
-                          disabled={!onRemoveVoiceAssistantModel}
-                        >
-                          Remove model
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </section>
-            )}
             {activeSection === "dictation" && (
               <section className="settings-section">
                 <div className="settings-section-title">Dictation</div>
                 <div className="settings-section-subtitle">
-                  Turn speech into text for the composer and notes.
+                  Enable microphone dictation with on-device transcription.
                 </div>
                 <div className="settings-toggle-row">
                   <div>
@@ -2562,6 +2327,70 @@ export function SettingsView({
                   </select>
                   <div className="settings-help">
                     Hold the key to start dictation, release to stop and process.
+                  </div>
+                </div>
+                <div className="settings-subsection-title">Speech</div>
+                <div className="settings-subsection-subtitle">
+                  Speak assistant responses aloud.
+                </div>
+                <div className="settings-toggle-row">
+                  <div>
+                    <div className="settings-toggle-title">Enable voice replies</div>
+                    <div className="settings-toggle-subtitle">
+                      Uses macOS system voices via the built-in speech engine.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={`settings-toggle ${appSettings.ttsEnabled ? "on" : ""}`}
+                    onClick={() =>
+                      void onUpdateAppSettings({
+                        ...appSettings,
+                        ttsEnabled: !appSettings.ttsEnabled,
+                      })
+                    }
+                    aria-pressed={appSettings.ttsEnabled}
+                  >
+                    <span className="settings-toggle-knob" />
+                  </button>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label" htmlFor="tts-voice">
+                    Voice (optional)
+                  </label>
+                  <div className="settings-field-row">
+                    <input
+                      id="tts-voice"
+                      className="settings-input"
+                      value={appSettings.ttsVoice ?? ""}
+                      onChange={(event) =>
+                        void onUpdateAppSettings({
+                          ...appSettings,
+                          ttsVoice: event.target.value || null,
+                        })
+                      }
+                      placeholder="Samantha"
+                    />
+                    <button
+                      type="button"
+                      className="ghost settings-button-compact"
+                      onClick={() =>
+                        void speakText(
+                          "Friday online. Voice check complete.",
+                          appSettings.ttsVoice,
+                        ).catch(() => {
+                          pushErrorToast({
+                            title: "Voice preview failed",
+                            message: "Unable to play the preview voice.",
+                          });
+                        })
+                      }
+                    >
+                      Preview
+                    </button>
+                  </div>
+                  <div className="settings-help">
+                    Leave empty to use the system default voice.
                   </div>
                 </div>
                 {dictationModelStatus && (

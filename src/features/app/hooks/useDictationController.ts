@@ -22,10 +22,7 @@ type DictationController = {
   cancelDictation: ReturnType<typeof useDictation>["cancel"];
 };
 
-export function useDictationController(
-  appSettings: AppSettings,
-  options?: { suppress?: boolean },
-): DictationController {
+export function useDictationController(appSettings: AppSettings): DictationController {
   const dictationModel = useDictationModel(appSettings.dictationModelId);
   const {
     state: dictationState,
@@ -41,13 +38,12 @@ export function useDictationController(
     clearHint: clearDictationHint,
   } = useDictation();
   const dictationReady = dictationModel.status?.state === "ready";
-  const dictationEnabled = appSettings.dictationEnabled && !options?.suppress;
   const holdDictationKey = (appSettings.dictationHoldKey ?? "").toLowerCase();
   const permissionRequestPendingRef = useRef(false);
   const permissionRequestedRef = useRef(false);
 
   const handleToggleDictation = useCallback(async () => {
-    if (!dictationEnabled || !dictationReady) {
+    if (!appSettings.dictationEnabled || !dictationReady) {
       return;
     }
     try {
@@ -62,8 +58,8 @@ export function useDictationController(
       // Errors are surfaced through dictation events.
     }
   }, [
+    appSettings.dictationEnabled,
     appSettings.dictationPreferredLanguage,
-    dictationEnabled,
     dictationReady,
     dictationState,
     startDictation,
@@ -93,7 +89,7 @@ export function useDictationController(
   }, []);
 
   useHoldToDictate({
-    enabled: dictationEnabled,
+    enabled: appSettings.dictationEnabled,
     ready: dictationReady,
     state: dictationState,
     preferredLanguage: appSettings.dictationPreferredLanguage,
@@ -104,7 +100,7 @@ export function useDictationController(
   });
 
   useEffect(() => {
-    if (!dictationEnabled) {
+    if (!appSettings.dictationEnabled) {
       permissionRequestedRef.current = false;
       return;
     }
@@ -127,7 +123,7 @@ export function useDictationController(
       .finally(() => {
         permissionRequestPendingRef.current = false;
       });
-  }, [dictationEnabled, dictationReady]);
+  }, [appSettings.dictationEnabled, dictationReady]);
 
 
   return {

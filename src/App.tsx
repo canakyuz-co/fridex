@@ -72,7 +72,6 @@ import { useComposerShortcuts } from "./features/composer/hooks/useComposerShort
 import { useComposerMenuActions } from "./features/composer/hooks/useComposerMenuActions";
 import { useComposerEditorState } from "./features/composer/hooks/useComposerEditorState";
 import { useDictationController } from "./features/app/hooks/useDictationController";
-import { useDictationModel } from "./features/dictation/hooks/useDictationModel";
 import { useComposerController } from "./features/app/hooks/useComposerController";
 import { useComposerInsert } from "./features/app/hooks/useComposerInsert";
 import { useRenameThreadPrompt } from "./features/threads/hooks/useRenameThreadPrompt";
@@ -105,7 +104,7 @@ import { useTasks } from "./features/tasks/hooks/useTasks";
 import { WorkspaceHome } from "./features/workspaces/components/WorkspaceHome";
 import { useWorkspaceHome } from "./features/workspaces/hooks/useWorkspaceHome";
 import { useWorkspaceAgentMd } from "./features/workspaces/hooks/useWorkspaceAgentMd";
-import { pickWorkspacePath, requestDictationPermission } from "./services/tauri";
+import { pickWorkspacePath } from "./services/tauri";
 import { pushErrorToast } from "./services/toasts";
 import type {
   AccessMode,
@@ -207,8 +206,6 @@ function MainApp() {
     queueSaveSettings,
   } = useAppSettingsController();
   useCodeCssVars(appSettings);
-  const [voiceAssistantActive, setVoiceAssistantActive] = useState(false);
-  const [voiceAssistantSpeaking, setVoiceAssistantSpeaking] = useState(false);
   const {
     dictationModel,
     dictationState,
@@ -224,9 +221,9 @@ function MainApp() {
     clearDictationTranscript,
     clearDictationError,
     clearDictationHint,
-  } = useDictationController(appSettings, { suppress: voiceAssistantActive });
-  const voiceAssistantModel = useDictationModel(appSettings.voiceAssistantModelId);
-  const voiceAssistantReady = voiceAssistantModel.status?.state === "ready";
+  } = useDictationController(appSettings);
+  const [voiceAssistantActive, setVoiceAssistantActive] = useState(false);
+  const [voiceAssistantSpeaking, setVoiceAssistantSpeaking] = useState(false);
   const voiceSpeakingTimeoutRef = useRef<number | null>(null);
   const voiceAutoStopRef = useRef<number | null>(null);
   const voiceRestartRef = useRef<number | null>(null);
@@ -244,10 +241,10 @@ function MainApp() {
     }, 1500);
   }, [appSettings.ttsEnabled, voiceAssistantActive]);
   const handleToggleVoiceAssistant = useCallback(async () => {
-    if (!voiceAssistantReady) {
+    if (!dictationReady) {
       pushErrorToast({
         title: "Voice assistant unavailable",
-        message: "Download a model in Settings > Voice Assistant.",
+        message: "Download a dictation model in Settings > Dictation.",
       });
       return;
     }
@@ -270,21 +267,7 @@ function MainApp() {
     }
     setVoiceAssistantActive(true);
     try {
-      const permissionGranted = await requestDictationPermission();
-      if (!permissionGranted) {
-        pushErrorToast({
-          title: "Microphone permission needed",
-          message: "Grant microphone access and try again.",
-        });
-        setVoiceAssistantActive(false);
-        return;
-      }
-      if (dictationState === "processing") {
-        await cancelDictation();
-      }
-      if (dictationState === "idle") {
-        await startDictation(appSettings.voiceAssistantPreferredLanguage);
-      }
+      await startDictation(appSettings.dictationPreferredLanguage);
     } catch {
       pushErrorToast({
         title: "Voice assistant failed to start",
@@ -293,13 +276,13 @@ function MainApp() {
       setVoiceAssistantActive(false);
     }
   }, [
-    appSettings.voiceAssistantPreferredLanguage,
+    appSettings.dictationPreferredLanguage,
     cancelDictation,
+    dictationReady,
     dictationState,
     startDictation,
     stopDictation,
     voiceAssistantActive,
-    voiceAssistantReady,
   ]);
   useEffect(() => {
     return () => {
@@ -872,8 +855,6 @@ function MainApp() {
     onTtsStart: triggerVoiceSpeaking,
   });
   const dictationTranscriptForUi = voiceAssistantActive ? null : dictationTranscript;
-  const dictationErrorForUi = voiceAssistantActive ? null : dictationError;
-  const dictationHintForUi = voiceAssistantActive ? null : dictationHint;
   useEffect(() => {
     if (!voiceAssistantActive || !dictationTranscript) {
       return;
@@ -909,7 +890,7 @@ function MainApp() {
       }
       voiceRestartRef.current = window.setTimeout(() => {
         if (voiceAssistantActive) {
-          void startDictation(appSettings.voiceAssistantPreferredLanguage);
+          void startDictation(appSettings.dictationPreferredLanguage);
         }
       }, 300);
     }
@@ -924,7 +905,7 @@ function MainApp() {
       }
     };
   }, [
-    appSettings.voiceAssistantPreferredLanguage,
+    appSettings.dictationPreferredLanguage,
     dictationState,
     startDictation,
     stopDictation,
@@ -2089,7 +2070,7 @@ function MainApp() {
         rightPanelCollapsed={rightPanelCollapsed}
         sidebarToggleProps={sidebarToggleProps}
         voiceAssistantActive={voiceAssistantActive}
-        voiceAssistantReady={voiceAssistantReady}
+        voiceAssistantReady={dictationReady}
         onToggleVoiceAssistant={handleToggleVoiceAssistant}
       />
     ),
@@ -2272,7 +2253,7 @@ function MainApp() {
     composerEditorSettings,
     composerEditorExpanded,
     onToggleComposerEditorExpanded: toggleComposerEditorExpanded,
-    dictationEnabled: appSettings.dictationEnabled && dictationReady && !voiceAssistantActive,
+    dictationEnabled: appSettings.dictationEnabled && dictationReady,
     dictationState,
     dictationLevel,
     onToggleDictation: handleToggleDictation,
@@ -2280,9 +2261,9 @@ function MainApp() {
     onDictationTranscriptHandled: (id) => {
       clearDictationTranscript(id);
     },
-    dictationError: dictationErrorForUi,
+    dictationError,
     onDismissDictationError: clearDictationError,
-    dictationHint: dictationHintForUi,
+    dictationHint,
     onDismissDictationHint: clearDictationHint,
     voiceAssistantState,
     composerSendLabel,
@@ -2348,14 +2329,14 @@ function MainApp() {
       skills={skills}
       prompts={prompts}
       files={files}
-      dictationEnabled={appSettings.dictationEnabled && dictationReady && !voiceAssistantActive}
+      dictationEnabled={appSettings.dictationEnabled && dictationReady}
       dictationState={dictationState}
       dictationLevel={dictationLevel}
       onToggleDictation={handleToggleDictation}
       onOpenDictationSettings={() => openSettings("dictation")}
-      dictationError={dictationErrorForUi}
+      dictationError={dictationError}
       onDismissDictationError={clearDictationError}
-      dictationHint={dictationHintForUi}
+      dictationHint={dictationHint}
       onDismissDictationHint={clearDictationHint}
       dictationTranscript={dictationTranscriptForUi}
       onDictationTranscriptHandled={clearDictationTranscript}
@@ -2543,10 +2524,6 @@ function MainApp() {
           onDownloadDictationModel: dictationModel.download,
           onCancelDictationDownload: dictationModel.cancel,
           onRemoveDictationModel: dictationModel.remove,
-          voiceAssistantModelStatus: voiceAssistantModel.status,
-          onDownloadVoiceAssistantModel: voiceAssistantModel.download,
-          onCancelVoiceAssistantDownload: voiceAssistantModel.cancel,
-          onRemoveVoiceAssistantModel: voiceAssistantModel.remove,
         }}
       />
     </div>
