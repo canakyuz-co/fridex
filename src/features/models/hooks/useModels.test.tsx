@@ -28,9 +28,9 @@ describe("useModels", () => {
       result: {
         data: [
           {
-            id: "remote-1",
-            model: "gpt-5.1",
-            displayName: "GPT-5.1",
+            id: "gpt-5.2-codex",
+            model: "gpt-5.2-codex",
+            displayName: "GPT-5.2 Codex",
             supportedReasoningEfforts: [],
             defaultReasoningEffort: null,
             isDefault: true,
@@ -38,7 +38,7 @@ describe("useModels", () => {
         ],
       },
     });
-    vi.mocked(getConfigModel).mockResolvedValueOnce("custom-model");
+    vi.mocked(getConfigModel).mockResolvedValueOnce("gpt-5.2");
 
     const { result } = renderHook(() =>
       useModels({ activeWorkspace: workspace }),
@@ -48,10 +48,10 @@ describe("useModels", () => {
 
     expect(getConfigModel).toHaveBeenCalledWith("workspace-1");
     expect(result.current.models[0]).toMatchObject({
-      id: "custom-model",
-      model: "custom-model",
+      id: "gpt-5.2",
+      model: "gpt-5.2",
     });
-    expect(result.current.selectedModel?.model).toBe("custom-model");
+    expect(result.current.selectedModel?.model).toBe("gpt-5.2");
     expect(result.current.reasoningSupported).toBe(false);
   });
 
@@ -91,9 +91,9 @@ describe("useModels", () => {
       result: {
         data: [
           {
-            id: "remote-1",
-            model: "gpt-5.1",
-            displayName: "GPT-5.1",
+            id: "gpt-5.2",
+            model: "gpt-5.2",
+            displayName: "GPT-5.2",
             supportedReasoningEfforts: [
               { reasoningEffort: "low", description: "Low" },
               { reasoningEffort: "medium", description: "Medium" },
@@ -101,10 +101,18 @@ describe("useModels", () => {
             defaultReasoningEffort: "medium",
             isDefault: true,
           },
+          {
+            id: "gpt-5.2-codex",
+            model: "gpt-5.2-codex",
+            displayName: "GPT-5.2 Codex",
+            supportedReasoningEfforts: [],
+            defaultReasoningEffort: null,
+            isDefault: false,
+          },
         ],
       },
     });
-    vi.mocked(getConfigModel).mockResolvedValueOnce("custom-model");
+    vi.mocked(getConfigModel).mockResolvedValueOnce("gpt-5.2");
 
     const { result } = renderHook(() =>
       useModels({ activeWorkspace: workspace }),
@@ -114,11 +122,11 @@ describe("useModels", () => {
 
     act(() => {
       result.current.setSelectedEffort("high");
-      result.current.setSelectedModelId("custom-model");
+      result.current.setSelectedModelId("gpt-5.2-codex");
     });
 
     await waitFor(() => {
-      expect(result.current.selectedModelId).toBe("custom-model");
+      expect(result.current.selectedModelId).toBe("gpt-5.2-codex");
       expect(result.current.selectedEffort).toBe("high");
     });
   });

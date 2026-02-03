@@ -12,6 +12,56 @@ type UseModelsOptions = {
 
 const CONFIG_MODEL_DESCRIPTION = "Configured in CODEX_HOME/config.toml";
 
+type GptFamily = { major: number; minor: number };
+
+// Parses `gpt-X` and `gpt-X.Y` prefixes; O(1) time, O(1) space.
+const parseGptFamily = (model: string): GptFamily | null => {
+  const match = /^gpt-(\d+)(?:\.(\d+))?/i.exec(model.trim());
+  if (!match) {
+    return null;
+  }
+  const major = Number(match[1]);
+  const minor = match[2] ? Number(match[2]) : 0;
+  if (!Number.isFinite(major) || !Number.isFinite(minor)) {
+    return null;
+  }
+  return { major, minor };
+};
+
+const compareGptFamily = (a: GptFamily, b: GptFamily) =>
+  a.major !== b.major ? a.major - b.major : a.minor - b.minor;
+
+// Keep only the latest GPT major.minor family from the codex model list.
+// Single pass; O(n) time, O(n) auxiliary space.
+const filterToLatestGptFamily = (models: ModelOption[]) => {
+  let maxFamily: GptFamily | null = null;
+  const buckets = new Map<string, ModelOption[]>();
+  for (const model of models) {
+    const family = parseGptFamily(model.model);
+    if (!family) {
+      continue;
+    }
+    const key = `${family.major}.${family.minor}`;
+    const bucket = buckets.get(key);
+    if (bucket) {
+      bucket.push(model);
+    } else {
+      buckets.set(key, [model]);
+    }
+    if (!maxFamily || compareGptFamily(family, maxFamily) > 0) {
+      maxFamily = family;
+    }
+  }
+  if (!maxFamily) {
+    return { models, maxFamily: null };
+  }
+  const key = `${maxFamily.major}.${maxFamily.minor}`;
+  return { models: buckets.get(key) ?? models, maxFamily };
+};
+
+const sameGptFamily = (a: GptFamily, b: GptFamily) =>
+  a.major === b.major && a.minor === b.minor;
+
 const normalizeEffort = (value: unknown): string | null => {
   if (typeof value !== "string") {
     return null;
@@ -234,32 +284,52 @@ export function useModels({
         ),
         isDefault: Boolean(item.isDefault ?? item.is_default ?? false),
       }));
-      const baseModels = (() => {
-        if (!configModelFromConfig) {
-          return dataFromServer;
+
+      const latestCodexModelInfo = filterToLatestGptFamily(dataFromServer);
+      const latestCodexModels = latestCodexModelInfo.models;
+
+      const normalizedConfigModel = (() => {
+        const trimmed = configModelFromConfig?.trim();
+        if (!trimmed) {
+          return null;
         }
-        const hasConfigModel = dataFromServer.some(
-          (model) => model.model === configModelFromConfig,
+        const latestFamily = latestCodexModelInfo.maxFamily;
+        if (!latestFamily) {
+          return trimmed;
+        }
+        const configFamily = parseGptFamily(trimmed);
+        if (!configFamily || !sameGptFamily(configFamily, latestFamily)) {
+          return null;
+        }
+        return trimmed;
+      })();
+
+      const baseModels = (() => {
+        if (!normalizedConfigModel) {
+          return latestCodexModels;
+        }
+        const hasConfigModel = latestCodexModels.some(
+          (model) => model.model === normalizedConfigModel,
         );
         if (hasConfigModel) {
-          return dataFromServer;
+          return latestCodexModels;
         }
         const configOption: ModelOption = {
-          id: configModelFromConfig,
-          model: configModelFromConfig,
-          displayName: `${configModelFromConfig} (config)`,
+          id: normalizedConfigModel,
+          model: normalizedConfigModel,
+          displayName: `${normalizedConfigModel} (config)`,
           description: CONFIG_MODEL_DESCRIPTION,
           supportedReasoningEfforts: [],
           defaultReasoningEffort: null,
           isDefault: false,
         };
-        return [configOption, ...dataFromServer];
+        return [configOption, ...latestCodexModels];
       })();
       baseModelsRef.current = baseModels;
       setModels(mergeModels(baseModels, extraModels));
       lastFetchedWorkspaceId.current = workspaceId;
       const mergedModels = mergeModels(baseModels, extraModels);
-      const defaultModel = pickDefaultModel(mergedModels, configModelFromConfig);
+      const defaultModel = pickDefaultModel(mergedModels, normalizedConfigModel);
       const existingSelection = findModelByIdOrModel(mergedModels, selectedModelId);
       if (selectedModelId && !existingSelection) {
         hasUserSelectedModel.current = false;

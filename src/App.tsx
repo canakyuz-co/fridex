@@ -123,6 +123,7 @@ import { DEFAULT_RATE_LIMIT_KEY } from "./features/threads/hooks/useThreadsReduc
 import { useCodeCssVars } from "./features/app/hooks/useCodeCssVars";
 import { useAccountSwitching } from "./features/app/hooks/useAccountSwitching";
 import { useNewAgentDraft } from "./features/app/hooks/useNewAgentDraft";
+import { formatOtherAiModelSlug } from "./utils/otherAiModels";
 
 const AboutView = lazy(() =>
   import("./features/about/components/AboutView").then((module) => ({
@@ -160,10 +161,11 @@ function buildOtherAiModels(providers: OtherAiProvider[]): ModelOption[] {
         return;
       }
       seen.add(id);
+      const formatted = formatOtherAiModelSlug(provider.provider, trimmed);
       models.push({
         id,
         model: id,
-        displayName: `${provider.label} · ${trimmed}`,
+        displayName: `${provider.label} · ${formatted || trimmed}`,
         description: provider.provider,
         supportedReasoningEfforts: [],
         defaultReasoningEffort: null,
