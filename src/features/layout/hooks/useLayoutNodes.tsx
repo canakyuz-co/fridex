@@ -427,7 +427,6 @@ type LayoutNodesOptions = {
   onDismissDictationError: () => void;
   dictationHint: string | null;
   onDismissDictationHint: () => void;
-  voiceAssistantState?: "idle" | "listening" | "thinking" | "speaking";
   showComposer: boolean;
   composerSendLabel?: string;
   plan: TurnPlan | null;
@@ -735,9 +734,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       {mainHeaderNode}
     </>
   );
-  const desktopTopbarCenterNode = (
-    <FridayAura state={options.voiceAssistantState ?? "idle"} />
-  );
+  const desktopTopbarCenterNode = <FridayAura />;
 
   const tabletNavNode = (
     <TabletNav activeTab={options.tabletNavTab} onSelect={options.onSelectTab} />

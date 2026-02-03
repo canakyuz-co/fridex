@@ -34,7 +34,6 @@ type UseThreadsOptions = {
   onClaudeUsage?: (usage: ClaudeUsage) => void;
   ttsEnabled?: boolean;
   ttsVoice?: string | null;
-  onTtsStart?: () => void;
 };
 
 export function useThreads({
@@ -53,7 +52,6 @@ export function useThreads({
   onClaudeUsage,
   ttsEnabled = false,
   ttsVoice = null,
-  onTtsStart,
 }: UseThreadsOptions) {
   const [state, dispatch] = useReducer(threadReducer, initialState);
   const loadedThreadsRef = useRef<Record<string, boolean>>({});
@@ -154,12 +152,11 @@ export function useThreads({
       }
       const maxLength = 1000;
       const clipped = trimmed.length > maxLength ? `${trimmed.slice(0, maxLength)}…` : trimmed;
-      onTtsStart?.();
       void speakText(clipped, ttsVoice).catch(() => {
         // Ignore TTS errors to avoid breaking message flow.
       });
     },
-    [activeThreadId, onTtsStart, ttsEnabled, ttsVoice],
+    [activeThreadId, ttsEnabled, ttsVoice],
   );
 
   const handlers = useThreadEventHandlers({
