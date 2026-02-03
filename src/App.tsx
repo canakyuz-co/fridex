@@ -207,6 +207,7 @@ function MainApp() {
     scaleShortcutTitle,
     scaleShortcutText,
     queueSaveSettings,
+    otherAiModelsSyncPercent,
   } = useAppSettingsController();
   useCodeCssVars(appSettings);
   const {
@@ -1848,6 +1849,7 @@ function MainApp() {
     activeRateLimits,
     claudeUsage: isOtherAiModel ? claudeUsage : null,
     isOtherAiModel,
+    otherAiModelsSyncPercent,
     usageShowRemaining: appSettings.usageShowRemaining,
     accountInfo: activeAccount,
     onSwitchAccount: handleSwitchAccount,

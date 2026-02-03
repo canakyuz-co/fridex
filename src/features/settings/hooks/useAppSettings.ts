@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppSettings } from "../../../types";
-import { getAppSettings, runCodexDoctor, updateAppSettings } from "../../../services/tauri";
+import {
+  getAppSettings,
+  listOtherAiModels,
+  runCodexDoctor,
+  updateAppSettings,
+} from "../../../services/tauri";
 import { clampUiScale, UI_SCALE_DEFAULT } from "../../../utils/uiScale";
 import {
   DEFAULT_CODE_FONT_FAMILY,
@@ -10,6 +15,7 @@ import {
   clampCodeFontSize,
   normalizeInterFontFeatures,
 } from "../../../utils/fonts";
+import { getFallbackOtherAiModels, normalizeModelList } from "../../../utils/otherAiModels";
 import {
   DEFAULT_OPEN_APP_ID,
   DEFAULT_OPEN_APP_TARGETS,
@@ -41,8 +47,10 @@ const defaultSettings: AppSettings = {
       apiKey: null,
       command: "claude",
       args: null,
-      models: ["claude-4.5-opus", "claude-4.5-sonnet"],
+      models: getFallbackOtherAiModels("claude"),
       defaultModel: null,
+      protocol: "cli",
+      env: null,
     },
     {
       id: "gemini",
@@ -52,8 +60,10 @@ const defaultSettings: AppSettings = {
       apiKey: null,
       command: "gemini",
       args: null,
-      models: [],
+      models: getFallbackOtherAiModels("gemini"),
       defaultModel: null,
+      protocol: "cli",
+      env: null,
     },
   ],
   defaultAccessMode: "current",
@@ -204,6 +214,12 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
 export function useAppSettings() {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
+  const [otherAiModelsSyncPercent, setOtherAiModelsSyncPercent] = useState<number | null>(
+    null,
+  );
+  const syncInFlightRef = useRef(false);
+  const didInitialOtherAiModelsSyncRef = useRef(false);
+  const clearSyncTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -243,6 +259,124 @@ export function useAppSettings() {
     return saved;
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    const sync = async () => {
+      if (syncInFlightRef.current) {
+        return;
+      }
+      const candidates = (settings.otherAiProviders ?? []).filter((provider) => {
+        if (!provider.enabled) {
+          return false;
+        }
+        const normalizedProvider = provider.provider?.trim().toLowerCase();
+        if (normalizedProvider !== "claude" && normalizedProvider !== "gemini") {
+          return false;
+        }
+        const apiKey = (provider.apiKey ?? "").trim();
+        const models = Array.isArray(provider.models) ? provider.models : [];
+        // Only do work when we can fetch (API key) or when we need to auto-fill (empty list).
+        return apiKey.length > 0 || models.length === 0;
+      });
+
+      if (candidates.length === 0) {
+        if (active) {
+          setOtherAiModelsSyncPercent(null);
+        }
+        return;
+      }
+
+      syncInFlightRef.current = true;
+      if (active) {
+        setOtherAiModelsSyncPercent(0);
+      }
+
+      const nextProviders = [...(settings.otherAiProviders ?? [])];
+      const total = candidates.length;
+      let completed = 0;
+      let changed = false;
+
+      for (const provider of candidates) {
+        const idx = nextProviders.findIndex((p) => p.id === provider.id);
+        if (idx < 0) {
+          completed += 1;
+          continue;
+        }
+        const providerType = provider.provider.trim().toLowerCase();
+        const apiKey = (provider.apiKey ?? "").trim();
+
+        const fallback = getFallbackOtherAiModels(providerType);
+        const existingModels = Array.isArray(provider.models) ? provider.models : [];
+        let models = existingModels;
+
+        // Prefer API list only when key is already present; otherwise keep existing list.
+        // If the list is empty, auto-fill from fallback so the model picker works.
+        if (apiKey) {
+          try {
+            models = await listOtherAiModels(providerType, apiKey);
+          } catch {
+            models = fallback.length > 0 ? fallback : existingModels;
+          }
+        } else if (existingModels.length === 0 && fallback.length > 0) {
+          models = fallback;
+        }
+
+        const normalizedModels = normalizeModelList(models);
+        const prevModels = Array.isArray(nextProviders[idx].models)
+          ? nextProviders[idx].models
+          : [];
+        const prevNormalized = normalizeModelList(prevModels);
+        if (JSON.stringify(prevNormalized) !== JSON.stringify(normalizedModels)) {
+          changed = true;
+        }
+        nextProviders[idx] = {
+          ...nextProviders[idx],
+          models: normalizedModels,
+        };
+
+        completed += 1;
+        if (active) {
+          setOtherAiModelsSyncPercent(Math.round((completed / total) * 100));
+        }
+      }
+
+      try {
+        if (changed) {
+          await saveSettings({ ...settings, otherAiProviders: nextProviders });
+        }
+      } finally {
+        syncInFlightRef.current = false;
+        if (active) {
+          // Leave 100% visible briefly so it feels deterministic.
+          if (clearSyncTimerRef.current) {
+            window.clearTimeout(clearSyncTimerRef.current);
+          }
+          clearSyncTimerRef.current = window.setTimeout(() => {
+            if (active) {
+              setOtherAiModelsSyncPercent(null);
+            }
+          }, 800);
+        }
+      }
+    };
+
+    if (!isLoading) {
+      if (!didInitialOtherAiModelsSyncRef.current) {
+        didInitialOtherAiModelsSyncRef.current = true;
+        void sync();
+      }
+    }
+
+    return () => {
+      active = false;
+      if (clearSyncTimerRef.current) {
+        window.clearTimeout(clearSyncTimerRef.current);
+        clearSyncTimerRef.current = null;
+      }
+    };
+  }, [isLoading, saveSettings, settings]);
+
   const doctor = useCallback(
     async (codexBin: string | null, codexArgs: string | null) => {
       return runCodexDoctor(codexBin, codexArgs);
@@ -256,5 +390,6 @@ export function useAppSettings() {
     saveSettings,
     doctor,
     isLoading,
+    otherAiModelsSyncPercent,
   };
 }

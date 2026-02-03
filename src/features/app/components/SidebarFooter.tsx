@@ -17,6 +17,7 @@ type SidebarFooterProps = {
   weeklyResetLabel: string | null;
   creditsLabel: string | null;
   showWeekly: boolean;
+  otherAiModelsSyncPercent?: number | null;
   claudeUsage?: ClaudeUsageSnapshot | null;
   isOtherAiModel?: boolean;
 };
@@ -28,15 +29,37 @@ export function SidebarFooter({
   weeklyResetLabel,
   creditsLabel,
   showWeekly,
+  otherAiModelsSyncPercent,
   claudeUsage,
   isOtherAiModel,
 }: SidebarFooterProps) {
+  const showModelsSync = typeof otherAiModelsSyncPercent === "number";
+
   if (isOtherAiModel && claudeUsage) {
     const totalTokens = claudeUsage.sessionInputTokens + claudeUsage.sessionOutputTokens;
     const cacheTokens = claudeUsage.sessionCacheReadTokens + claudeUsage.sessionCacheCreationTokens;
 
     return (
       <div className="sidebar-footer">
+        {showModelsSync && (
+          <div className="usage-bars">
+            <div className="usage-block">
+              <div className="usage-label">
+                <span className="usage-title">
+                  <span>Models</span>
+                  <span className="usage-reset">· Syncing</span>
+                </span>
+                <span className="usage-value">{otherAiModelsSyncPercent}%</span>
+              </div>
+              <div className="usage-bar">
+                <span
+                  className="usage-bar-fill"
+                  style={{ width: `${otherAiModelsSyncPercent}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
         <div className="usage-bars claude-usage">
           <div className="usage-block">
             <div className="usage-label">
@@ -81,6 +104,23 @@ export function SidebarFooter({
   return (
     <div className="sidebar-footer">
       <div className="usage-bars">
+        {showModelsSync && (
+          <div className="usage-block">
+            <div className="usage-label">
+              <span className="usage-title">
+                <span>Models</span>
+                <span className="usage-reset">· Syncing</span>
+              </span>
+              <span className="usage-value">{otherAiModelsSyncPercent}%</span>
+            </div>
+            <div className="usage-bar">
+              <span
+                className="usage-bar-fill"
+                style={{ width: `${otherAiModelsSyncPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
         <div className="usage-block">
           <div className="usage-label">
             <span className="usage-title">

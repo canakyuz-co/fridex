@@ -50,6 +50,10 @@ import {
   isInterFontFamily,
   normalizeFontFamily,
 } from "../../../utils/fonts";
+import {
+  getFallbackOtherAiModels,
+  normalizeModelList,
+} from "../../../utils/otherAiModels";
 import { DEFAULT_OPEN_APP_ID, OPEN_APP_STORAGE_KEY } from "../../app/constants";
 import { GENERIC_APP_ICON, getKnownOpenAppIcon } from "../../app/utils/openAppIcons";
 import { useGlobalAgentsMd } from "../hooks/useGlobalAgentsMd";
@@ -126,22 +130,6 @@ const EDITOR_KEYMAP_OPTIONS: Array<{
   { id: "default", label: "Monaco Default" },
 ];
 
-const FALLBACK_OTHER_AI_MODELS: Record<string, string[]> = {
-  claude: [
-    "claude-sonnet-4-5",
-    "claude-opus-4-5",
-    "claude-haiku-4-5",
-  ],
-  gemini: [
-    "gemini-3-pro-preview",
-    "gemini-3-flash-preview",
-    "gemini-2.5-pro",
-  ],
-};
-
-const getFallbackOtherAiModels = (provider: string) =>
-  FALLBACK_OTHER_AI_MODELS[provider] ?? [];
-
 const normalizeOverrideValue = (value: string): string | null => {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
@@ -179,13 +167,11 @@ const normalizeTextValue = (value: string) => {
 };
 
 const parseModelList = (value: string) =>
-  Array.from(
-    new Set(
-      value
-        .split(/[\n,]+/g)
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0),
-    ),
+  normalizeModelList(
+    value
+      .split(/[\n,]+/g)
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0),
   );
 
 const formatEnvText = (value: Record<string, string> | null | undefined) => {
@@ -1053,14 +1039,14 @@ export function SettingsView({
     const apiKey = (draft.apiKey ?? provider.apiKey ?? "").trim();
     const prefersCli = normalizedProvider.protocol === "cli";
     const useCli = (prefersCli || !apiKey) && canUseCli;
-    const fallbackModels = getFallbackOtherAiModels(providerType);
-    if (!useCli && !apiKey && fallbackModels.length > 0) {
-      handleOtherAiDraftChange(provider.id, {
-        provider: providerType,
-        modelsText: fallbackModels.join("\n"),
-      });
-      return;
-    }
+      const fallbackModels = getFallbackOtherAiModels(providerType);
+      if (!useCli && !apiKey && fallbackModels.length > 0) {
+        handleOtherAiDraftChange(provider.id, {
+          provider: providerType,
+          modelsText: fallbackModels.join("\n"),
+        });
+        return;
+      }
     setOtherAiFetchState((prev) => ({
       ...prev,
       [provider.id]: { loading: true },
@@ -1076,13 +1062,7 @@ export function SettingsView({
       if (models.length === 0 && fallbackModels.length > 0) {
         models = fallbackModels;
       }
-      const normalizedModels = Array.from(
-        new Set(
-          models
-            .map((model: string) => model.trim())
-            .filter((model: string) => model.length > 0),
-        ),
-      );
+      const normalizedModels = normalizeModelList(models);
       handleOtherAiDraftChange(provider.id, {
         provider: providerType,
         modelsText: normalizedModels.join("\n"),

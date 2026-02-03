@@ -58,6 +58,7 @@ type SidebarProps = {
   accountRateLimits: RateLimitSnapshot | null;
   claudeUsage?: ClaudeUsageSnapshot | null;
   isOtherAiModel?: boolean;
+  otherAiModelsSyncPercent?: number | null;
   usageShowRemaining: boolean;
   accountInfo: AccountSnapshot | null;
   onSwitchAccount: () => void;
@@ -113,6 +114,7 @@ export function Sidebar({
   accountRateLimits,
   claudeUsage,
   isOtherAiModel,
+  otherAiModelsSyncPercent,
   usageShowRemaining,
   accountInfo,
   onSwitchAccount,
@@ -670,6 +672,7 @@ export function Sidebar({
         weeklyResetLabel={weeklyResetLabel}
         creditsLabel={creditsLabel}
         showWeekly={showWeekly}
+        otherAiModelsSyncPercent={otherAiModelsSyncPercent}
         claudeUsage={claudeUsage}
         isOtherAiModel={isOtherAiModel}
       />

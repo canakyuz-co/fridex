@@ -122,6 +122,7 @@ type LayoutNodesOptions = {
   activeRateLimits: RateLimitSnapshot | null;
   claudeUsage?: ClaudeUsageSnapshot | null;
   isOtherAiModel?: boolean;
+  otherAiModelsSyncPercent?: number | null;
   usageShowRemaining: boolean;
   accountInfo: AccountSnapshot | null;
   onSwitchAccount: () => void;
@@ -508,6 +509,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       accountRateLimits={options.activeRateLimits}
       claudeUsage={options.claudeUsage}
       isOtherAiModel={options.isOtherAiModel}
+      otherAiModelsSyncPercent={options.otherAiModelsSyncPercent}
       usageShowRemaining={options.usageShowRemaining}
       accountInfo={options.accountInfo}
       onSwitchAccount={options.onSwitchAccount}
