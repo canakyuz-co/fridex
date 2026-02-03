@@ -227,11 +227,14 @@ function MainApp() {
   } = useDictationController(appSettings, { suppress: voiceAssistantActive });
   const voiceAssistantModel = useDictationModel(appSettings.voiceAssistantModelId);
   const voiceAssistantReady = voiceAssistantModel.status?.state === "ready";
+  const ttsEnabledForAssistant = appSettings.ttsEnabled || voiceAssistantActive;
+  const [voiceAssistantArmed, setVoiceAssistantArmed] = useState(false);
   const voiceSpeakingTimeoutRef = useRef<number | null>(null);
   const voiceAutoStopRef = useRef<number | null>(null);
   const voiceRestartRef = useRef<number | null>(null);
+  const voiceArmTimeoutRef = useRef<number | null>(null);
   const triggerVoiceSpeaking = useCallback(() => {
-    if (!voiceAssistantActive || !appSettings.ttsEnabled) {
+    if (!voiceAssistantActive || !ttsEnabledForAssistant) {
       return;
     }
     if (voiceSpeakingTimeoutRef.current) {
@@ -242,7 +245,27 @@ function MainApp() {
       setVoiceAssistantSpeaking(false);
       voiceSpeakingTimeoutRef.current = null;
     }, 1500);
-  }, [appSettings.ttsEnabled, voiceAssistantActive]);
+  }, [ttsEnabledForAssistant, voiceAssistantActive]);
+  const disarmVoiceAssistant = useCallback(() => {
+    if (voiceArmTimeoutRef.current) {
+      window.clearTimeout(voiceArmTimeoutRef.current);
+      voiceArmTimeoutRef.current = null;
+    }
+    setVoiceAssistantArmed(false);
+  }, []);
+  const armVoiceAssistant = useCallback(
+    (durationMs: number) => {
+      if (voiceArmTimeoutRef.current) {
+        window.clearTimeout(voiceArmTimeoutRef.current);
+      }
+      setVoiceAssistantArmed(true);
+      voiceArmTimeoutRef.current = window.setTimeout(() => {
+        voiceArmTimeoutRef.current = null;
+        setVoiceAssistantArmed(false);
+      }, durationMs);
+    },
+    [],
+  );
   const handleToggleVoiceAssistant = useCallback(async () => {
     if (!voiceAssistantReady) {
       pushErrorToast({
@@ -266,6 +289,7 @@ function MainApp() {
       } else if (dictationState === "processing") {
         await cancelDictation();
       }
+      disarmVoiceAssistant();
       return;
     }
     setVoiceAssistantActive(true);
@@ -285,6 +309,7 @@ function MainApp() {
       if (dictationState === "idle") {
         await startDictation(appSettings.voiceAssistantPreferredLanguage);
       }
+      disarmVoiceAssistant();
     } catch {
       pushErrorToast({
         title: "Voice assistant failed to start",
@@ -296,6 +321,7 @@ function MainApp() {
     appSettings.voiceAssistantPreferredLanguage,
     cancelDictation,
     dictationState,
+    disarmVoiceAssistant,
     startDictation,
     stopDictation,
     voiceAssistantActive,
@@ -311,6 +337,9 @@ function MainApp() {
       }
       if (voiceRestartRef.current) {
         window.clearTimeout(voiceRestartRef.current);
+      }
+      if (voiceArmTimeoutRef.current) {
+        window.clearTimeout(voiceArmTimeoutRef.current);
       }
     };
   }, []);
@@ -867,10 +896,12 @@ function MainApp() {
     otherAiProviders: appSettings.otherAiProviders,
     onMessageActivity: queueGitStatusRefresh,
     onClaudeUsage: handleClaudeUsage,
-    ttsEnabled: appSettings.ttsEnabled,
+    ttsEnabled: ttsEnabledForAssistant,
     ttsVoice: appSettings.ttsVoice,
     onTtsStart: triggerVoiceSpeaking,
   });
+  const dictationStateForUi = voiceAssistantActive ? "idle" : dictationState;
+  const dictationLevelForUi = voiceAssistantActive ? 0 : dictationLevel;
   const dictationTranscriptForUi = voiceAssistantActive ? null : dictationTranscript;
   const dictationErrorForUi = voiceAssistantActive ? null : dictationError;
   const dictationHintForUi = voiceAssistantActive ? null : dictationHint;
@@ -883,12 +914,32 @@ function MainApp() {
     if (!text) {
       return;
     }
-    void sendUserMessage(text);
+    const wakeWordPattern = /\bfriday\b/i;
+    const wakeWordStrip = /\bfriday\b[\s,!.?"]*/i;
+    const hasWakeWord = wakeWordPattern.test(text);
+    if (hasWakeWord) {
+      const command = text.replace(wakeWordStrip, "").trim();
+      if (command) {
+        void sendUserMessage(command);
+        disarmVoiceAssistant();
+        return;
+      }
+      void sendUserMessage("Friday");
+      armVoiceAssistant(8000);
+      return;
+    }
+    if (voiceAssistantArmed) {
+      void sendUserMessage(text);
+      disarmVoiceAssistant();
+    }
   }, [
+    armVoiceAssistant,
     clearDictationTranscript,
+    disarmVoiceAssistant,
     dictationTranscript,
     sendUserMessage,
     voiceAssistantActive,
+    voiceAssistantArmed,
   ]);
   useEffect(() => {
     if (!voiceAssistantActive) {
@@ -2273,8 +2324,8 @@ function MainApp() {
     composerEditorExpanded,
     onToggleComposerEditorExpanded: toggleComposerEditorExpanded,
     dictationEnabled: appSettings.dictationEnabled && dictationReady && !voiceAssistantActive,
-    dictationState,
-    dictationLevel,
+    dictationState: dictationStateForUi,
+    dictationLevel: dictationLevelForUi,
     onToggleDictation: handleToggleDictation,
     dictationTranscript: dictationTranscriptForUi,
     onDictationTranscriptHandled: (id) => {
@@ -2349,8 +2400,8 @@ function MainApp() {
       prompts={prompts}
       files={files}
       dictationEnabled={appSettings.dictationEnabled && dictationReady && !voiceAssistantActive}
-      dictationState={dictationState}
-      dictationLevel={dictationLevel}
+      dictationState={dictationStateForUi}
+      dictationLevel={dictationLevelForUi}
       onToggleDictation={handleToggleDictation}
       onOpenDictationSettings={() => openSettings("dictation")}
       dictationError={dictationErrorForUi}
