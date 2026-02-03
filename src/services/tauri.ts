@@ -569,6 +569,14 @@ export async function listOtherAiModels(provider: string, apiKey: string): Promi
   return invoke<string[]>("list_other_ai_models", { provider, apiKey });
 }
 
+export async function listOtherAiModelsCli(
+  provider: string,
+  command: string,
+  env?: Record<string, string> | null,
+): Promise<string[]> {
+  return invoke<string[]>("list_other_ai_models_cli", { provider, command, env });
+}
+
 type MenuAcceleratorUpdate = {
   id: string;
   accelerator: string | null;

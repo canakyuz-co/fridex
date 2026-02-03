@@ -32,7 +32,12 @@ import {
   getDefaultInterruptShortcut,
 } from "../../../utils/shortcuts";
 import { clampUiScale } from "../../../utils/uiScale";
-import { getCodexConfigPath, listOtherAiModels, speakText } from "../../../services/tauri";
+import {
+  getCodexConfigPath,
+  listOtherAiModels,
+  listOtherAiModelsCli,
+  speakText,
+} from "../../../services/tauri";
 import { pushErrorToast } from "../../../services/toasts";
 import {
   CODE_FONT_FAMILY_OPTIONS,
@@ -1011,8 +1016,11 @@ export function SettingsView({
     if (providerType === "custom") {
       return;
     }
+    const normalizedProvider = normalizeOtherAiProvider(provider, draft);
+    const cliCommand = normalizedProvider.command?.trim() ?? "";
+    const useCli = normalizedProvider.protocol === "cli" && cliCommand.length > 0;
     const apiKey = (draft.apiKey ?? provider.apiKey ?? "").trim();
-    if (!apiKey) {
+    if (!useCli && !apiKey) {
       pushErrorToast({
         title: "API key required",
         message: `Enter an API key for ${providerType} to fetch models.`,
@@ -1024,17 +1032,23 @@ export function SettingsView({
       [provider.id]: { loading: true },
     }));
     try {
-      const models = await listOtherAiModels(providerType, apiKey);
-      const normalized = Array.from(
+      const models = useCli
+        ? await listOtherAiModelsCli(
+            providerType,
+            cliCommand,
+            normalizedProvider.env ?? null,
+          )
+        : await listOtherAiModels(providerType, apiKey);
+      const normalizedModels = Array.from(
         new Set(
           models
-            .map((model) => model.trim())
-            .filter((model) => model.length > 0),
+            .map((model: string) => model.trim())
+            .filter((model: string) => model.length > 0),
         ),
       );
       handleOtherAiDraftChange(provider.id, {
         provider: providerType,
-        modelsText: normalized.join("\n"),
+        modelsText: normalizedModels.join("\n"),
       });
     } catch (error) {
       pushErrorToast({
