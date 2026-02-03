@@ -3,7 +3,7 @@ import { useDictation } from "../../dictation/hooks/useDictation";
 import { useDictationModel } from "../../dictation/hooks/useDictationModel";
 import { useHoldToDictate } from "../../dictation/hooks/useHoldToDictate";
 import type { AppSettings } from "../../../types";
-import { requestDictationPermission } from "../../../services/tauri";
+import { requestDictationPermission, speakText } from "../../../services/tauri";
 
 type DictationController = {
   dictationModel: ReturnType<typeof useDictationModel>;
@@ -41,6 +41,9 @@ export function useDictationController(appSettings: AppSettings): DictationContr
   const holdDictationKey = (appSettings.dictationHoldKey ?? "").toLowerCase();
   const permissionRequestPendingRef = useRef(false);
   const permissionRequestedRef = useRef(false);
+  const wakeWordHandledRef = useRef<string | null>(null);
+  const WAKE_WORD_PATTERN = /^friday[\s!?.,"']*$/i;
+  const WAKE_WORD_ACK_TR = "Efendim?";
 
   const handleToggleDictation = useCallback(async () => {
     if (!appSettings.dictationEnabled || !dictationReady) {
@@ -124,6 +127,29 @@ export function useDictationController(appSettings: AppSettings): DictationContr
         permissionRequestPendingRef.current = false;
       });
   }, [appSettings.dictationEnabled, dictationReady]);
+
+  useEffect(() => {
+    if (!dictationTranscript) {
+      wakeWordHandledRef.current = null;
+      return;
+    }
+    const text = dictationTranscript.text.trim();
+    if (!text || !WAKE_WORD_PATTERN.test(text)) {
+      return;
+    }
+    if (wakeWordHandledRef.current === dictationTranscript.id) {
+      return;
+    }
+    wakeWordHandledRef.current = dictationTranscript.id;
+    clearDictationTranscript(dictationTranscript.id);
+    void speakText(WAKE_WORD_ACK_TR, appSettings.ttsVoice).catch(() => {
+      // Ignore TTS errors to avoid blocking dictation flow.
+    });
+  }, [
+    appSettings.ttsVoice,
+    clearDictationTranscript,
+    dictationTranscript,
+  ]);
 
   return {
     dictationModel,
