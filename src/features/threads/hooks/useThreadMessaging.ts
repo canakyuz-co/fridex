@@ -101,6 +101,8 @@ type PlanJsonPayload = {
 };
 
 const PLAN_MODE_ID = "plan";
+const WAKE_WORD_PATTERN = /^friday[\s!?.,"']*$/i;
+const WAKE_WORD_ACK_TR = "Efendim?";
 
 function extractPlanJson(text: string): PlanJsonPayload | null {
   const start = text.indexOf("{");
@@ -275,6 +277,41 @@ export function useThreadMessaging({
         "Always respond in the same language as the user's most recent message.";
       const messageText = text.trim();
       if (!messageText && images.length === 0) {
+        return;
+      }
+      if (!images.length && WAKE_WORD_PATTERN.test(messageText)) {
+        const assistantText = WAKE_WORD_ACK_TR;
+        const assistantMessageId = `assistant-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}`;
+        dispatch({
+          type: "upsertItem",
+          workspaceId: workspace.id,
+          threadId,
+          item: {
+            id: assistantMessageId,
+            kind: "message",
+            role: "assistant",
+            text: assistantText,
+          },
+          hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
+        });
+        const timestamp = Date.now();
+        dispatch({
+          type: "setThreadTimestamp",
+          workspaceId: workspace.id,
+          threadId,
+          timestamp,
+        });
+        dispatch({
+          type: "setLastAgentMessage",
+          threadId,
+          text: assistantText,
+          timestamp,
+        });
+        recordThreadActivity(workspace.id, threadId, timestamp);
+        safeMessageActivity();
+        onAssistantMessageCompleted?.(workspace.id, threadId, assistantText);
         return;
       }
       let finalText = messageText;
