@@ -1,0 +1,14 @@
+{
+  "release-type": "node",
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "packages": {
+    ".": {
+      "package-name": "friday",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "src-tauri/tauri.conf.json"
+      ]
+    }
+  }
+}
