@@ -13,10 +13,20 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - name: Run release-please
-        uses: google-github-actions/release-please-action@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
-          target-branch: Dev
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          node-version: 20
+
+      - name: Run release-please
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx release-please release-pr \
+            --config-file release-please-config.json \
+            --manifest-file .release-please-manifest.json \
+            --target-branch Dev
