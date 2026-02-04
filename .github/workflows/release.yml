@@ -386,7 +386,7 @@ jobs:
             if not sig_path.exists():
               raise SystemExit(f"Missing signature for {tarball.name}")
             platforms[f"darwin-{arch}"] = {
-              "url": f"https://github.com/canakyuz/Fridex/releases/download/v${VERSION}/{tarball.name}",
+              "url": f"https://github.com/canakyuz-co/fridex/releases/download/v${VERSION}/{tarball.name}",
               "signature": sig_path.read_text().strip(),
             }
 
@@ -404,7 +404,7 @@ jobs:
             if not sig_path.exists():
               raise SystemExit(f"Missing signature for {appimage.name}")
             platforms[f"linux-{arch}"] = {
-              "url": f"https://github.com/canakyuz/Fridex/releases/download/v${VERSION}/{appimage.name}",
+              "url": f"https://github.com/canakyuz-co/fridex/releases/download/v${VERSION}/{appimage.name}",
               "signature": sig_path.read_text().strip(),
             }
 
@@ -414,7 +414,7 @@ jobs:
             if not sig_path.exists():
               raise SystemExit(f"Missing signature for {msi.name}")
             platforms["windows-x86_64"] = {
-              "url": f"https://github.com/canakyuz/Fridex/releases/download/v${VERSION}/{msi.name}",
+              "url": f"https://github.com/canakyuz-co/fridex/releases/download/v${VERSION}/{msi.name}",
               "signature": sig_path.read_text().strip(),
             }
 
