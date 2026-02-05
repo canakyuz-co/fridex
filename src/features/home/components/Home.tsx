@@ -644,8 +644,7 @@ export function Home({
         </div>
         {activeTab === "tasks" ? (
           <div className="home-tasks" role="tabpanel">
-            <div className="home-section-header">
-              <div className="home-section-title">Tasks</div>
+            <div className="home-section-header home-section-header--compact">
               <div className="home-tasks-controls">
                 <div className="home-tasks-controls-left">
                   <div
@@ -694,15 +693,15 @@ export function Home({
                       value={taskSort}
                       onChange={(event) =>
                         setTaskSort(event.target.value as typeof taskSort)
-                      }
-                      aria-label="Sort tasks"
-                    >
-                      <option value="updated">Sort: updated</option>
-                      <option value="created">Sort: created</option>
-                      <option value="title">Sort: title</option>
-                    </select>
-                  </div>
+                    }
+                    aria-label="Sort tasks"
+                  >
+                    <option value="updated">Updated</option>
+                    <option value="created">Created</option>
+                    <option value="title">Title</option>
+                  </select>
                 </div>
+              </div>
                 <div className="home-tasks-controls-right">
                   <div className="home-usage-select-wrap home-tasks-search-wrap">
                     <input

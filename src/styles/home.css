@@ -89,6 +89,10 @@
   gap: 12px;
 }
 
+.home-section-header--compact {
+  align-items: center;
+}
+
 .home-section-title {
   font-size: 13px;
   text-transform: uppercase;
