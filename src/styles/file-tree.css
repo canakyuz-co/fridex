@@ -19,6 +19,12 @@
   gap: 4px;
 }
 
+.file-tree-actions .icon-button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
 .file-tree-toggle {
   padding: 4px;
 }
@@ -69,6 +75,19 @@
   border-radius: 7px;
   padding: 0;
   color: var(--text-faint);
+}
+
+.file-tree-search-action {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  padding: 0;
+  color: var(--text-faint);
+}
+
+.file-tree-search-action:hover {
+  color: var(--text-emphasis);
 }
 
 .file-tree-search-filter:hover {

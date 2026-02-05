@@ -804,6 +804,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
         onInsertText={options.onInsertComposerText}
         onOpenFile={options.onOpenFile}
         canInsertText={options.canInsertComposerText}
+        showCreateActions={options.activeTab === "editor"}
         openTargets={options.openAppTargets}
         openAppIconById={options.openAppIconById}
         selectedOpenAppId={options.selectedOpenAppId}

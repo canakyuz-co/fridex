@@ -55,6 +55,7 @@ type FileTreePanelProps = {
   showMentionActions?: boolean;
   onOpenFile?: (path: string) => void;
   onRefreshFiles?: () => void;
+  showCreateActions?: boolean;
   openTargets: OpenAppTarget[];
   openAppIconById: Record<string, string>;
   selectedOpenAppId: string;
@@ -169,6 +170,7 @@ export function FileTreePanel({
   showMentionActions = true,
   onOpenFile,
   onRefreshFiles,
+  showCreateActions = false,
   openTargets,
   openAppIconById,
   selectedOpenAppId,
@@ -790,26 +792,6 @@ export function FileTreePanel({
             <button
               type="button"
               className="ghost icon-button"
-              onClick={() => handleCreateFile("")}
-              aria-label="New file"
-              title="New file"
-              disabled={actionBusy}
-            >
-              <FilePlus size={14} aria-hidden />
-            </button>
-            <button
-              type="button"
-              className="ghost icon-button"
-              onClick={() => handleCreateFolder("")}
-              aria-label="New folder"
-              title="New folder"
-              disabled={actionBusy}
-            >
-              <FolderPlus size={14} aria-hidden />
-            </button>
-            <button
-              type="button"
-              className="ghost icon-button"
               onClick={() => onRefreshFiles?.()}
               aria-label="Refresh files"
               title="Refresh files"
@@ -857,6 +839,30 @@ export function FileTreePanel({
         >
           <GitBranch size={14} aria-hidden />
         </button>
+        {showCreateActions && (
+          <>
+            <button
+              type="button"
+              className="ghost icon-button file-tree-search-action"
+              onClick={() => handleCreateFile("")}
+              aria-label="New file"
+              title="New file"
+              disabled={actionBusy}
+            >
+              <FilePlus size={14} aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="ghost icon-button file-tree-search-action"
+              onClick={() => handleCreateFolder("")}
+              aria-label="New folder"
+              title="New folder"
+              disabled={actionBusy}
+            >
+              <FolderPlus size={14} aria-hidden />
+            </button>
+          </>
+        )}
       </div>
       <div className="file-tree-list">
         {showLoading ? (
