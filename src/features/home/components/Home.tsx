@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
+import Plus from "lucide-react/dist/esm/icons/plus";
 import { Markdown } from "../../messages/components/Markdown";
 import type {
   LocalUsageSnapshot,
@@ -705,7 +706,7 @@ export function Home({
                 <div className="home-tasks-controls-right">
                   <div className="home-usage-select-wrap home-tasks-search-wrap">
                     <input
-                      className="home-usage-select home-tasks-search"
+                      className="home-tasks-search-input"
                       value={taskQuery}
                       onChange={(event) => setTaskQuery(event.target.value)}
                       placeholder="Search tasks…"
@@ -713,7 +714,7 @@ export function Home({
                     />
                   </div>
                   <button
-                    className="home-tasks-add-button"
+                    className="home-tasks-new-button"
                     type="button"
                     onClick={() =>
                       setTaskComposerOpen((current) => !current)
@@ -721,7 +722,8 @@ export function Home({
                     aria-expanded={isTaskComposerOpen}
                     aria-label="Add task"
                   >
-                    +
+                    <Plus size={14} aria-hidden />
+                    New
                   </button>
                 </div>
               </div>

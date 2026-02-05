@@ -479,17 +479,51 @@
 
 .home-tasks-search-wrap {
   min-width: 220px;
+  flex: 1;
 }
 
-.home-tasks-search {
-  cursor: text;
-  background-image: none;
-  padding-right: 0;
-  max-width: 360px;
+.home-tasks-search-input {
+  border: none;
+  background: transparent;
+  color: var(--text-stronger);
+  font-size: 12px;
+  padding: 3px 0;
+  width: 100%;
+  min-width: 140px;
+  max-width: 420px;
 }
 
-.home-tasks-search::placeholder {
+.home-tasks-search-input::placeholder {
   color: var(--text-faint);
+}
+
+.home-tasks-search-input:focus {
+  outline: none;
+}
+
+.home-tasks-new-button {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(90, 200, 255, 0.22);
+  background: linear-gradient(180deg, rgba(90, 200, 255, 0.18), rgba(90, 200, 255, 0.08));
+  color: var(--text-stronger);
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.home-tasks-new-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(90, 200, 255, 0.4);
+  background: linear-gradient(180deg, rgba(90, 200, 255, 0.24), rgba(90, 200, 255, 0.1));
+}
+
+.home-tasks-new-button:active {
+  transform: translateY(0);
 }
 
 .home-tasks-composer {
