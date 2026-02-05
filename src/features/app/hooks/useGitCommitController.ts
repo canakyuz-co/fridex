@@ -7,7 +7,6 @@ import {
   pullGit,
   pushGitDetailed,
   stageGitAll,
-  syncGit,
 } from "../../../services/tauri";
 import { shouldApplyCommitMessage } from "../../../utils/commitMessage";
 import { useGitStatus } from "../../git/hooks/useGitStatus";
@@ -274,7 +273,14 @@ export function useGitCommitController({
       commitSucceeded = true;
       setCommitMessage("");
       setCommitLoading(false);
-      await syncGit(activeWorkspace.id);
+      await pullGit(activeWorkspace.id);
+      const pushReport = await pushGitDetailed(activeWorkspace.id);
+      if (!pushReport.ok) {
+        setPushReport(pushReport);
+        setPushError(reportToErrorMessage(pushReport));
+        setSyncError("Push failed during sync.");
+        return;
+      }
       refreshGitStatus();
       refreshGitLog?.();
     } catch (error) {
@@ -372,10 +378,18 @@ export function useGitCommitController({
     }
     setSyncLoading(true);
     setSyncError(null);
+    setPushError(null);
+    setPushReport(null);
     try {
-      await syncGit(activeWorkspace.id);
+      await pullGit(activeWorkspace.id);
+      const report = await pushGitDetailed(activeWorkspace.id);
+      if (!report.ok) {
+        setPushReport(report);
+        setPushError(reportToErrorMessage(report));
+        setSyncError("Push failed during sync.");
+        return;
+      }
       setPullError(null);
-      setPushError(null);
       setSyncError(null);
       refreshGitStatus();
       refreshGitLog?.();
@@ -384,7 +398,13 @@ export function useGitCommitController({
     } finally {
       setSyncLoading(false);
     }
-  }, [activeWorkspace, refreshGitLog, refreshGitStatus, syncLoading]);
+  }, [
+    activeWorkspace,
+    refreshGitLog,
+    refreshGitStatus,
+    reportToErrorMessage,
+    syncLoading,
+  ]);
 
   return {
     commitMessage,
