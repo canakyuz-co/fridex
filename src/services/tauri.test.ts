@@ -9,7 +9,10 @@ import {
   getGitLog,
   getGitStatus,
   getOpenAppIcon,
+  listConfiguredMcpServers,
   listMcpServerStatus,
+  mcpServerOauthLogin,
+  mcpServerReload,
   readGlobalAgentsMd,
   readGlobalCodexConfigToml,
   listWorkspaces,
@@ -22,6 +25,7 @@ import {
   sendNotification,
   startReview,
   setThreadName,
+  setMcpServerEnabled,
   writeGlobalAgentsMd,
   writeGlobalCodexConfigToml,
   writeAgentMd,
@@ -155,6 +159,53 @@ describe("tauri invoke wrappers", () => {
       workspaceId: "ws-10",
       cursor: "cursor-1",
       limit: 25,
+    });
+  });
+
+  it("maps workspaceId for list_configured_mcp_servers", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce([]);
+
+    await listConfiguredMcpServers("ws-mcp");
+
+    expect(invokeMock).toHaveBeenCalledWith("list_configured_mcp_servers", {
+      workspaceId: "ws-mcp",
+    });
+  });
+
+  it("maps workspaceId/serverName/enabled for set_mcp_server_enabled", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({});
+
+    await setMcpServerEnabled("ws-mcp", "linear", false);
+
+    expect(invokeMock).toHaveBeenCalledWith("set_mcp_server_enabled", {
+      workspaceId: "ws-mcp",
+      serverName: "linear",
+      enabled: false,
+    });
+  });
+
+  it("maps workspaceId for mcp_server_reload", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({});
+
+    await mcpServerReload("ws-mcp");
+
+    expect(invokeMock).toHaveBeenCalledWith("mcp_server_reload", {
+      workspaceId: "ws-mcp",
+    });
+  });
+
+  it("maps workspaceId/serverName for mcp_server_oauth_login", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({});
+
+    await mcpServerOauthLogin("ws-mcp", "github");
+
+    expect(invokeMock).toHaveBeenCalledWith("mcp_server_oauth_login", {
+      workspaceId: "ws-mcp",
+      serverName: "github",
     });
   });
 

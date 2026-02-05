@@ -527,6 +527,29 @@ export async function getPromptsList(workspaceId: string) {
   return invoke<any>("prompts_list", { workspaceId });
 }
 
+export type LatexCompileDiagnostic = {
+  level: "error" | "warning" | string;
+  message: string;
+  line?: number | null;
+};
+
+export type LatexCompileResponse = {
+  pdfBase64: string;
+  log: string;
+  diagnostics: LatexCompileDiagnostic[];
+  cacheHit: boolean;
+};
+
+export async function latexCompile(
+  workspaceId: string,
+  path: string,
+  source: string,
+): Promise<LatexCompileResponse> {
+  return invoke<LatexCompileResponse>("latex_compile", {
+    req: { workspaceId, path, source },
+  });
+}
+
 export async function getWorkspacePromptsDir(workspaceId: string) {
   return invoke<string>("prompts_workspace_dir", { workspaceId });
 }
@@ -870,6 +893,36 @@ export async function listMcpServerStatus(
   limit?: number | null,
 ) {
   return invoke<any>("list_mcp_server_status", { workspaceId, cursor, limit });
+}
+
+export type McpServerConfigEntry = {
+  name: string;
+  enabled: boolean;
+};
+
+export async function listConfiguredMcpServers(
+  workspaceId: string,
+): Promise<McpServerConfigEntry[]> {
+  return invoke<McpServerConfigEntry[]>("list_configured_mcp_servers", { workspaceId });
+}
+
+export async function setMcpServerEnabled(
+  workspaceId: string,
+  serverName: string,
+  enabled: boolean,
+): Promise<void> {
+  return invoke("set_mcp_server_enabled", { workspaceId, serverName, enabled });
+}
+
+export async function mcpServerReload(workspaceId: string) {
+  return invoke<any>("mcp_server_reload", { workspaceId });
+}
+
+export async function mcpServerOauthLogin(
+  workspaceId: string,
+  serverName: string,
+) {
+  return invoke<any>("mcp_server_oauth_login", { workspaceId, serverName });
 }
 
 export async function listTasks(): Promise<TaskEntry[]> {

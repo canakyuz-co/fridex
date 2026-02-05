@@ -58,6 +58,7 @@ type AppServerEventHandlers = {
   onReasoningTextDelta?: (workspaceId: string, threadId: string, itemId: string, delta: string) => void;
   onPlanDelta?: (workspaceId: string, threadId: string, itemId: string, delta: string) => void;
   onCommandOutputDelta?: (workspaceId: string, threadId: string, itemId: string, delta: string) => void;
+  onMcpToolCallProgress?: (workspaceId: string, threadId: string, itemId: string, delta: string) => void;
   onTerminalInteraction?: (
     workspaceId: string,
     threadId: string,
@@ -428,6 +429,23 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
         const delta = String(params.delta ?? "");
         if (threadId && itemId && delta) {
           handlers.onFileChangeOutputDelta?.(workspace_id, threadId, itemId, delta);
+        }
+        return;
+      }
+
+      if (method === "item/mcpToolCall/progress") {
+        const params = message.params as Record<string, unknown>;
+        const threadId = String(params.threadId ?? params.thread_id ?? "");
+        const itemId = String(params.itemId ?? params.item_id ?? "");
+        const deltaRaw = params.delta ?? "";
+        const delta =
+          typeof deltaRaw === "string"
+            ? deltaRaw
+            : deltaRaw && typeof deltaRaw === "object"
+              ? JSON.stringify(deltaRaw)
+              : String(deltaRaw);
+        if (threadId && itemId && delta) {
+          handlers.onMcpToolCallProgress?.(workspace_id, threadId, itemId, delta);
         }
         return;
       }

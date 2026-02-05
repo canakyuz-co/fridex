@@ -2,18 +2,20 @@ use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::{Mutex, oneshot};
 use tokio::sync::oneshot::error::TryRecvError;
+use tokio::sync::{oneshot, Mutex};
 use tokio::time::timeout;
 use tokio::time::Instant;
 
 use crate::backend::app_server::WorkspaceSession;
 use crate::codex::config as codex_config;
 use crate::codex::home::{resolve_default_codex_home, resolve_workspace_codex_home};
+use crate::files::io::read_text_file_within;
+use crate::files::ops::write_with_policy;
+use crate::files::policy::{policy_for, FileKind, FileScope};
 use crate::rules;
 use crate::shared::account::{build_account_response, read_auth_account};
 use crate::types::WorkspaceEntry;
@@ -115,6 +117,205 @@ pub(crate) async fn list_mcp_server_status_core(
     let session = get_session_clone(sessions, &workspace_id).await?;
     let params = json!({ "cursor": cursor, "limit": limit });
     session.send_request("mcpServerStatus/list", params).await
+}
+
+pub(crate) async fn mcp_server_reload_core(
+    sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
+    workspace_id: String,
+) -> Result<Value, String> {
+    let session = get_session_clone(sessions, &workspace_id).await?;
+    session
+        .send_request("config/mcpServer/reload", json!({}))
+        .await
+}
+
+pub(crate) async fn mcp_server_oauth_login_core(
+    sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
+    workspace_id: String,
+    server_name: String,
+) -> Result<Value, String> {
+    let session = get_session_clone(sessions, &workspace_id).await?;
+    let params = json!({
+        "name": server_name,
+        "serverName": server_name,
+    });
+    session.send_request("mcpServer/oauth/login", params).await
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct McpServerConfigEntry {
+    pub(crate) name: String,
+    pub(crate) enabled: bool,
+}
+
+fn parse_mcp_server_section_header(line: &str) -> Option<String> {
+    // Accept:
+    // - [mcp_servers.foo]
+    // - [mcp_servers."foo bar"]
+    let trimmed = line.trim();
+    if !(trimmed.starts_with("[mcp_servers.") && trimmed.ends_with(']')) {
+        return None;
+    }
+    let inner = trimmed
+        .trim_start_matches("[mcp_servers.")
+        .trim_end_matches(']');
+    let inner = inner.trim();
+    if inner.starts_with('"') && inner.ends_with('"') && inner.len() >= 2 {
+        return Some(inner[1..inner.len() - 1].to_string());
+    }
+    if inner.is_empty() {
+        return None;
+    }
+    Some(inner.to_string())
+}
+
+fn list_configured_mcp_servers_from_toml(contents: &str) -> Vec<McpServerConfigEntry> {
+    // Time: O(N) lines, Space: O(S) servers.
+    let mut result = Vec::new();
+    let mut current: Option<String> = None;
+    let mut enabled: Option<bool> = None;
+
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            if let Some(name) = current.take() {
+                result.push(McpServerConfigEntry {
+                    name,
+                    enabled: enabled.unwrap_or(true),
+                });
+            }
+            enabled = None;
+            current = parse_mcp_server_section_header(trimmed);
+            continue;
+        }
+        if current.is_none() || trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if let Some((key, value)) = trimmed.split_once('=') {
+            if key.trim() != "enabled" {
+                continue;
+            }
+            let value = value.split('#').next().unwrap_or("").trim();
+            enabled = match value {
+                "true" => Some(true),
+                "false" => Some(false),
+                _ => enabled,
+            };
+        }
+    }
+    if let Some(name) = current.take() {
+        result.push(McpServerConfigEntry {
+            name,
+            enabled: enabled.unwrap_or(true),
+        });
+    }
+
+    result.sort_by(|a, b| a.name.cmp(&b.name));
+    result
+}
+
+fn normalize_mcp_server_header_name(name: &str) -> String {
+    // Use quoted key to support arbitrary server names.
+    format!("[mcp_servers.\"{}\"]", name.replace('"', "\\\""))
+}
+
+fn upsert_mcp_server_enabled(contents: &str, server_name: &str, enabled: bool) -> String {
+    // Single-pass string patching.
+    // Time: O(N) lines, Space: O(N).
+    let header = normalize_mcp_server_header_name(server_name);
+    let enabled_line = format!("enabled = {}", if enabled { "true" } else { "false" });
+
+    let mut lines: Vec<String> = contents.lines().map(|l| l.to_string()).collect();
+    let mut section_start: Option<usize> = None;
+    let mut section_end: usize = lines.len();
+
+    for (idx, line) in lines.iter().enumerate() {
+        if line.trim() == header {
+            section_start = Some(idx);
+            // Find end (next table)
+            for j in (idx + 1)..lines.len() {
+                let t = lines[j].trim();
+                if t.starts_with('[') && t.ends_with(']') {
+                    section_end = j;
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    if let Some(start) = section_start {
+        // Replace existing enabled line or insert near the top of the section.
+        for i in (start + 1)..section_end {
+            let t = lines[i].trim();
+            if t.starts_with("enabled") {
+                if let Some((key, _)) = t.split_once('=') {
+                    if key.trim() == "enabled" {
+                        lines[i] = enabled_line;
+                        return lines.join("\n") + "\n";
+                    }
+                }
+            }
+        }
+        lines.insert(start + 1, enabled_line);
+        return lines.join("\n") + "\n";
+    }
+
+    // Append new section.
+    if !lines.is_empty() && !lines.last().unwrap_or(&"".to_string()).trim().is_empty() {
+        lines.push(String::new());
+    }
+    lines.push(header);
+    lines.push(enabled_line);
+    lines.join("\n") + "\n"
+}
+
+fn config_policy() -> Result<crate::files::policy::FilePolicy, String> {
+    policy_for(FileScope::Global, FileKind::Config)
+}
+
+fn read_config_contents_from_root(root: &PathBuf) -> Result<Option<String>, String> {
+    let policy = config_policy()?;
+    let response = read_text_file_within(
+        root,
+        policy.filename,
+        policy.root_may_be_missing,
+        policy.root_context,
+        policy.filename,
+        policy.allow_external_symlink_target,
+    )?;
+    if response.exists {
+        Ok(Some(response.content))
+    } else {
+        Ok(None)
+    }
+}
+
+fn write_config_contents_to_root(root: &PathBuf, contents: &str) -> Result<(), String> {
+    let policy = config_policy()?;
+    write_with_policy(root, policy, contents)
+}
+
+pub(crate) async fn list_configured_mcp_servers_core(
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+    workspace_id: String,
+) -> Result<Vec<McpServerConfigEntry>, String> {
+    let codex_home = resolve_codex_home_for_workspace_core(workspaces, &workspace_id).await?;
+    let contents = read_config_contents_from_root(&codex_home)?.unwrap_or_default();
+    Ok(list_configured_mcp_servers_from_toml(&contents))
+}
+
+pub(crate) async fn set_mcp_server_enabled_core(
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+    workspace_id: String,
+    server_name: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let codex_home = resolve_codex_home_for_workspace_core(workspaces, &workspace_id).await?;
+    let contents = read_config_contents_from_root(&codex_home)?.unwrap_or_default();
+    let updated = upsert_mcp_server_enabled(&contents, &server_name, enabled);
+    write_config_contents_to_root(&codex_home, &updated)
 }
 
 pub(crate) async fn archive_thread_core(
@@ -272,11 +473,7 @@ fn read_models_cache_entries(codex_home: &Path) -> Option<Vec<Value>> {
     let models = parsed.get("models")?.as_array()?;
     let mut entries = Vec::with_capacity(models.len());
     for model in models {
-        if model
-            .get("visibility")
-            .and_then(|value| value.as_str())
-            != Some("list")
-        {
+        if model.get("visibility").and_then(|value| value.as_str()) != Some("list") {
             continue;
         }
         let slug = model.get("slug")?.as_str()?.trim();
@@ -441,14 +638,16 @@ pub(crate) async fn codex_login_core(
                 CodexLoginCancelState::LoginId(_) => {}
             }
         }
-        cancels.insert(workspace_id.clone(), CodexLoginCancelState::PendingStart(cancel_tx));
+        cancels.insert(
+            workspace_id.clone(),
+            CodexLoginCancelState::PendingStart(cancel_tx),
+        );
     }
 
     let start = Instant::now();
     let mut cancel_rx = cancel_rx;
-    let mut login_request: Pin<Box<_>> = Box::pin(
-        session.send_request("account/login/start", json!({ "type": "chatgpt" })),
-    );
+    let mut login_request: Pin<Box<_>> =
+        Box::pin(session.send_request("account/login/start", json!({ "type": "chatgpt" })));
 
     let response = loop {
         match cancel_rx.try_recv() {
@@ -498,7 +697,10 @@ pub(crate) async fn codex_login_core(
 
     {
         let mut cancels = codex_login_cancels.lock().await;
-        cancels.insert(workspace_id, CodexLoginCancelState::LoginId(login_id.clone()));
+        cancels.insert(
+            workspace_id,
+            CodexLoginCancelState::LoginId(login_id.clone()),
+        );
     }
 
     Ok(json!({

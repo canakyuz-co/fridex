@@ -33,9 +33,15 @@ import {
 import { clampUiScale } from "../../../utils/uiScale";
 import {
   getCodexConfigPath,
+  listConfiguredMcpServers,
+  listMcpServerStatus,
   listOtherAiModels,
   listOtherAiModelsCli,
+  mcpServerOauthLogin,
+  mcpServerReload,
+  setMcpServerEnabled,
 } from "../../../services/tauri";
+import type { McpServerConfigEntry } from "../../../services/tauri";
 import { pushErrorToast } from "../../../services/toasts";
 import {
   CODE_FONT_FAMILY_OPTIONS,
@@ -563,6 +569,165 @@ export function SettingsView({
     () => projects.some((workspace) => workspace.settings.codexHome != null),
     [projects],
   );
+
+  const [mcpWorkspaceId, setMcpWorkspaceId] = useState<string>("");
+  const [mcpConfigured, setMcpConfigured] = useState<McpServerConfigEntry[]>([]);
+  const [mcpStatus, setMcpStatus] = useState<Array<Record<string, unknown>>>([]);
+  const [mcpLoading, setMcpLoading] = useState(false);
+  const [mcpError, setMcpError] = useState<string | null>(null);
+
+  const parseMcpStatusResponse = useCallback((response: unknown) => {
+    const raw = response as Record<string, unknown> | null;
+    const result = (raw?.result ?? raw) as Record<string, unknown> | null;
+    if (Array.isArray(result?.data)) {
+      return result?.data as Array<Record<string, unknown>>;
+    }
+    return [];
+  }, []);
+
+  const refreshMcp = useCallback(async () => {
+    if (!mcpWorkspaceId) {
+      return;
+    }
+    setMcpLoading(true);
+    setMcpError(null);
+    try {
+      const [configured, statusResponse] = await Promise.all([
+        listConfiguredMcpServers(mcpWorkspaceId),
+        listMcpServerStatus(mcpWorkspaceId, null, null),
+      ]);
+      setMcpConfigured(configured);
+      setMcpStatus(parseMcpStatusResponse(statusResponse));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load MCP servers.";
+      setMcpError(message);
+    } finally {
+      setMcpLoading(false);
+    }
+  }, [mcpWorkspaceId, parseMcpStatusResponse]);
+
+  const handleMcpReload = useCallback(async () => {
+    if (!mcpWorkspaceId) {
+      return;
+    }
+    try {
+      await mcpServerReload(mcpWorkspaceId);
+      await refreshMcp();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to reload MCP servers.";
+      pushErrorToast({ title: "MCP reload failed", message });
+    }
+  }, [mcpWorkspaceId, refreshMcp]);
+
+  const handleMcpOauthLogin = useCallback(
+    async (serverName: string) => {
+      if (!mcpWorkspaceId) {
+        return;
+      }
+      try {
+        await mcpServerOauthLogin(mcpWorkspaceId, serverName);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to start MCP OAuth login.";
+        pushErrorToast({ title: "MCP login failed", message });
+      }
+    },
+    [mcpWorkspaceId],
+  );
+
+  const handleMcpSetEnabled = useCallback(
+    async (serverName: string, enabled: boolean) => {
+      if (!mcpWorkspaceId) {
+        return;
+      }
+      try {
+        await setMcpServerEnabled(mcpWorkspaceId, serverName, enabled);
+        await refreshMcp();
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to update MCP server settings.";
+        pushErrorToast({ title: "MCP update failed", message });
+      }
+    },
+    [mcpWorkspaceId, refreshMcp],
+  );
+
+  const mcpRows = useMemo(() => {
+    const configuredByName = new Map<string, McpServerConfigEntry>();
+    for (const entry of mcpConfigured) {
+      const name = String(entry.name ?? "").trim();
+      if (name) {
+        configuredByName.set(name, entry);
+      }
+    }
+
+    const statusByName = new Map<string, Record<string, unknown>>();
+    for (const entry of mcpStatus) {
+      const name = String(entry?.name ?? "").trim();
+      if (name) {
+        statusByName.set(name, entry);
+      }
+    }
+
+    const allNames = new Set<string>([
+      ...configuredByName.keys(),
+      ...statusByName.keys(),
+    ]);
+
+    const rows = [...allNames]
+      .map((name) => {
+        const configured = configuredByName.get(name) ?? null;
+        const status = statusByName.get(name) ?? null;
+
+        const enabled = configured?.enabled ?? true;
+
+        const authRaw = status ? (status["authStatus"] ?? status["auth_status"]) : null;
+        const authLabel =
+          typeof authRaw === "string"
+            ? authRaw
+            : authRaw && typeof authRaw === "object" && "status" in authRaw
+              ? String((authRaw as { status?: unknown }).status ?? "")
+              : "";
+
+        const toolsRaw = status ? status["tools"] : null;
+        const toolsRecord =
+          toolsRaw && typeof toolsRaw === "object" && !Array.isArray(toolsRaw)
+            ? (toolsRaw as Record<string, unknown>)
+            : null;
+        const toolsCount = toolsRecord ? Object.keys(toolsRecord).length : 0;
+
+        const resourcesRaw = status ? status["resources"] : null;
+        const resourcesCount = Array.isArray(resourcesRaw) ? resourcesRaw.length : 0;
+        const templatesRaw = status ? (status["resourceTemplates"] ?? status["resource_templates"]) : null;
+        const templatesCount = Array.isArray(templatesRaw) ? templatesRaw.length : 0;
+
+        return {
+          name,
+          enabled,
+          configured,
+          authLabel,
+          toolsCount,
+          resourcesCount,
+          templatesCount,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return rows;
+  }, [mcpConfigured, mcpStatus]);
+
+  useEffect(() => {
+    if (!mcpWorkspaceId && projects.length > 0) {
+      setMcpWorkspaceId(projects[0].id);
+    }
+  }, [mcpWorkspaceId, projects]);
+
+  useEffect(() => {
+    if (activeSection !== "codex") {
+      return;
+    }
+    void refreshMcp();
+  }, [activeSection, refreshMcp]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -3498,6 +3663,98 @@ export function SettingsView({
                     help: "settings-help",
                   }}
                 />
+
+                <div className="settings-field">
+                  <div className="settings-field-label">MCP servers</div>
+                  <div className="settings-field-row">
+                    <select
+                      className="settings-select"
+                      value={mcpWorkspaceId}
+                      onChange={(event) => setMcpWorkspaceId(event.target.value)}
+                      aria-label="MCP workspace"
+                    >
+                      <option value="">Select a workspace…</option>
+                      {projects.map((workspace) => (
+                        <option key={workspace.id} value={workspace.id}>
+                          {workspace.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => {
+                        void refreshMcp();
+                      }}
+                      disabled={mcpLoading || !mcpWorkspaceId}
+                    >
+                      Refresh
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => {
+                        void handleMcpReload();
+                      }}
+                      disabled={mcpLoading || !mcpWorkspaceId}
+                    >
+                      Reload
+                    </button>
+                  </div>
+                  <div className="settings-help">
+                    Per-workspace view based on that workspace&apos;s resolved{" "}
+                    <code>CODEX_HOME/config.toml</code>. Reload applies changes to the running
+                    app-server session.
+                  </div>
+                  {mcpError && <div className="settings-help">{mcpError}</div>}
+
+                  <div className="settings-overrides">
+                    {mcpRows.map((row) => (
+                      <div key={row.name} className="settings-override-row">
+                        <div className="settings-override-info">
+                          <div className="settings-project-name">{row.name}</div>
+                          <div className="settings-project-path">
+                            {(row.configured ? "Configured" : "Not in config.toml") +
+                              (row.authLabel ? ` · auth: ${row.authLabel}` : "") +
+                              (row.toolsCount > 0 ? ` · tools: ${row.toolsCount}` : "") +
+                              (row.resourcesCount > 0 || row.templatesCount > 0
+                                ? ` · resources: ${row.resourcesCount}, templates: ${row.templatesCount}`
+                                : "")}
+                          </div>
+                        </div>
+                        <div className="settings-override-actions">
+                          <div className="settings-override-field">
+                            <button
+                              type="button"
+                              className={`settings-toggle ${row.enabled ? "on" : ""}`}
+                              onClick={() => {
+                                void handleMcpSetEnabled(row.name, !row.enabled);
+                              }}
+                              aria-pressed={row.enabled}
+                              disabled={mcpLoading || !mcpWorkspaceId}
+                              aria-label={`Toggle MCP server ${row.name}`}
+                            >
+                              <span className="settings-toggle-knob" />
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={() => {
+                                void handleMcpOauthLogin(row.name);
+                              }}
+                              disabled={mcpLoading || !mcpWorkspaceId}
+                            >
+                              Login
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {!mcpLoading && mcpRows.length === 0 && (
+                      <div className="settings-empty">No MCP servers found.</div>
+                    )}
+                  </div>
+                </div>
 
                 <div className="settings-field">
                   <div className="settings-field-label">Workspace overrides</div>

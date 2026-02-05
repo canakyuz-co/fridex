@@ -2,37 +2,38 @@ use tauri::Manager;
 #[cfg(target_os = "macos")]
 use tauri::{RunEvent, WindowEvent};
 
+mod acp;
+mod ai_core;
 mod backend;
+mod claude_api;
+mod claude_cli;
 mod codex;
-mod files;
 mod dictation;
 mod event_sink;
+mod files;
+mod gemini_api;
+mod gemini_cli;
 mod git;
 mod git_utils;
 mod local_usage;
 mod lsp;
 mod menu;
 mod notifications;
+mod other_ai;
+mod latex;
 mod prompts;
 mod remote_backend;
 mod rules;
 mod settings;
+mod shared;
 mod state;
 mod storage;
 mod tasks;
-mod shared;
 mod terminal;
 mod types;
 mod utils;
 mod window;
 mod workspaces;
-mod ai_core;
-mod acp;
-mod claude_api;
-mod claude_cli;
-mod gemini_api;
-mod gemini_cli;
-mod other_ai;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -150,6 +151,10 @@ pub fn run() {
             codex::fork_thread,
             codex::list_threads,
             codex::list_mcp_server_status,
+            codex::mcp_server_reload,
+            codex::mcp_server_oauth_login,
+            codex::list_configured_mcp_servers,
+            codex::set_mcp_server_enabled,
             codex::archive_thread,
             codex::set_thread_name,
             codex::collaboration_mode_list,
@@ -228,7 +233,8 @@ pub fn run() {
             tasks::set_task_status,
             tasks::delete_task,
             notifications::is_macos_debug_build,
-            notifications::send_notification_fallback
+            notifications::send_notification_fallback,
+            latex::latex_compile
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

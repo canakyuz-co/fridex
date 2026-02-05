@@ -71,6 +71,7 @@ export function useThreadEventHandlers({
     onCommandOutputDelta,
     onTerminalInteraction,
     onFileChangeOutputDelta,
+    onMcpToolCallProgress,
   } = useThreadItemEvents({
     activeThreadId,
     dispatch,
@@ -147,6 +148,7 @@ export function useThreadEventHandlers({
       onReasoningTextDelta,
       onPlanDelta,
       onCommandOutputDelta,
+      onMcpToolCallProgress,
       onTerminalInteraction,
       onFileChangeOutputDelta,
       onThreadStarted,
@@ -173,6 +175,7 @@ export function useThreadEventHandlers({
       onReasoningTextDelta,
       onPlanDelta,
       onCommandOutputDelta,
+      onMcpToolCallProgress,
       onTerminalInteraction,
       onFileChangeOutputDelta,
       onThreadStarted,

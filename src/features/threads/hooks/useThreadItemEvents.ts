@@ -247,6 +247,13 @@ export function useThreadItemEvents({
     [handleToolOutputDelta],
   );
 
+  const onMcpToolCallProgress = useCallback(
+    (_workspaceId: string, threadId: string, itemId: string, delta: string) => {
+      handleToolOutputDelta(threadId, itemId, delta);
+    },
+    [handleToolOutputDelta],
+  );
+
   return {
     onAgentMessageDelta,
     onAgentMessageCompleted,
@@ -259,5 +266,6 @@ export function useThreadItemEvents({
     onCommandOutputDelta,
     onTerminalInteraction,
     onFileChangeOutputDelta,
+    onMcpToolCallProgress,
   };
 }

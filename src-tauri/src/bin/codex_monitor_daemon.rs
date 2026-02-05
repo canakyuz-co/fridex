@@ -3,10 +3,10 @@
 mod backend;
 #[path = "../codex/args.rs"]
 mod codex_args;
-#[path = "../codex/home.rs"]
-mod codex_home;
 #[path = "../codex/config.rs"]
 mod codex_config;
+#[path = "../codex/home.rs"]
+mod codex_home;
 #[path = "../files/io.rs"]
 mod file_io;
 #[path = "../files/ops.rs"]
@@ -15,17 +15,17 @@ mod file_ops;
 mod file_policy;
 #[path = "../rules.rs"]
 mod rules;
-#[path = "../storage.rs"]
-mod storage;
 #[path = "../shared/mod.rs"]
 mod shared;
+#[path = "../storage.rs"]
+mod storage;
+#[allow(dead_code)]
+#[path = "../types.rs"]
+mod types;
 #[path = "../utils.rs"]
 mod utils;
 #[path = "../workspaces/settings.rs"]
 mod workspace_settings;
-#[allow(dead_code)]
-#[path = "../types.rs"]
-mod types;
 
 // Provide feature-style module paths for shared cores when compiled in the daemon.
 mod codex {
@@ -70,24 +70,16 @@ use tokio::sync::{broadcast, mpsc, Mutex};
 
 use crate::utils::{git_env_path, resolve_git_binary};
 
-use backend::app_server::{
-    spawn_workspace_session, WorkspaceSession,
-};
+use backend::app_server::{spawn_workspace_session, WorkspaceSession};
 use backend::events::{AppServerEvent, EventSink, TerminalExit, TerminalOutput};
-use storage::{read_settings, read_workspaces};
 use shared::{
     acp_core::AcpHost,
     codex_core::{self, CodexLoginCancelState},
-    files_core,
-    git_core,
-    settings_core,
-    workspaces_core,
-    worktree_core,
+    files_core, git_core, settings_core, workspaces_core, worktree_core,
 };
+use storage::{read_settings, read_workspaces};
+use types::{AppSettings, WorkspaceEntry, WorkspaceInfo, WorkspaceSettings, WorktreeSetupStatus};
 use workspace_settings::apply_workspace_settings_update;
-use types::{
-    AppSettings, WorkspaceEntry, WorkspaceInfo, WorkspaceSettings, WorktreeSetupStatus,
-};
 
 const DEFAULT_LISTEN_ADDR: &str = "127.0.0.1:4732";
 
@@ -204,27 +196,22 @@ impl DaemonState {
         host.start_session(command, args, env).await
     }
 
-    async fn acp_send(
-        &self,
-        session_id: String,
-        request: Value,
-    ) -> Result<Value, String> {
+    async fn acp_send(&self, session_id: String, request: Value) -> Result<Value, String> {
         let mut host = self.acp_host.lock().await;
         host.send(&session_id, request).await
     }
 
-    async fn acp_send_stream(
-        &self,
-        session_id: String,
-        request: Value,
-    ) -> Result<Value, String> {
+    async fn acp_send_stream(&self, session_id: String, request: Value) -> Result<Value, String> {
         let mut host = self.acp_host.lock().await;
         let event_session_id = session_id.clone();
         host.send_stream(&session_id, request, |event| {
-            let _ = self.event_sink.tx.send(DaemonEvent::AcpEvent(AcpEventPayload {
-                session_id: event_session_id.clone(),
-                payload: event.clone(),
-            }));
+            let _ = self
+                .event_sink
+                .tx
+                .send(DaemonEvent::AcpEvent(AcpEventPayload {
+                    session_id: event_session_id.clone(),
+                    payload: event.clone(),
+                }));
         })
         .await
     }
@@ -314,14 +301,21 @@ impl DaemonState {
         .await
     }
 
-    async fn worktree_setup_status(&self, workspace_id: String) -> Result<WorktreeSetupStatus, String> {
+    async fn worktree_setup_status(
+        &self,
+        workspace_id: String,
+    ) -> Result<WorktreeSetupStatus, String> {
         workspaces_core::worktree_setup_status_core(&self.workspaces, &workspace_id, &self.data_dir)
             .await
     }
 
     async fn worktree_setup_mark_ran(&self, workspace_id: String) -> Result<(), String> {
-        workspaces_core::worktree_setup_mark_ran_core(&self.workspaces, &workspace_id, &self.data_dir)
-            .await
+        workspaces_core::worktree_setup_mark_ran_core(
+            &self.workspaces,
+            &workspace_id,
+            &self.data_dir,
+        )
+        .await
     }
 
     async fn remove_workspace(&self, id: String) -> Result<(), String> {
@@ -388,7 +382,9 @@ impl DaemonState {
                 }
             },
             |value| worktree_core::sanitize_worktree_name(value),
-            |root, name, current| worktree_core::unique_worktree_path_for_rename(root, name, current),
+            |root, name, current| {
+                worktree_core::unique_worktree_path_for_rename(root, name, current)
+            },
             |root, args| {
                 workspaces_core::run_git_command_unit(root, args, git_core::run_git_command_owned)
             },
@@ -590,11 +586,7 @@ impl DaemonState {
         .await
     }
 
-    async fn create_workspace_dir(
-        &self,
-        workspace_id: String,
-        path: String,
-    ) -> Result<(), String> {
+    async fn create_workspace_dir(&self, workspace_id: String, path: String) -> Result<(), String> {
         workspaces_core::create_workspace_dir_core(
             &self.workspaces,
             &workspace_id,
@@ -721,7 +713,11 @@ impl DaemonState {
         codex_core::start_thread_core(&self.sessions, workspace_id).await
     }
 
-    async fn resume_thread(&self, workspace_id: String, thread_id: String) -> Result<Value, String> {
+    async fn resume_thread(
+        &self,
+        workspace_id: String,
+        thread_id: String,
+    ) -> Result<Value, String> {
         codex_core::resume_thread_core(&self.sessions, workspace_id, thread_id).await
     }
 
@@ -747,7 +743,47 @@ impl DaemonState {
         codex_core::list_mcp_server_status_core(&self.sessions, workspace_id, cursor, limit).await
     }
 
-    async fn archive_thread(&self, workspace_id: String, thread_id: String) -> Result<Value, String> {
+    async fn mcp_server_reload(&self, workspace_id: String) -> Result<Value, String> {
+        codex_core::mcp_server_reload_core(&self.sessions, workspace_id).await
+    }
+
+    async fn mcp_server_oauth_login(
+        &self,
+        workspace_id: String,
+        server_name: String,
+    ) -> Result<Value, String> {
+        codex_core::mcp_server_oauth_login_core(&self.sessions, workspace_id, server_name).await
+    }
+
+    async fn list_configured_mcp_servers(&self, workspace_id: String) -> Result<Value, String> {
+        let servers =
+            codex_core::list_configured_mcp_servers_core(&self.workspaces, workspace_id).await?;
+        serde_json::to_value(servers).map_err(|err| err.to_string())
+    }
+
+    async fn set_mcp_server_enabled(
+        &self,
+        workspace_id: String,
+        server_name: String,
+        enabled: bool,
+    ) -> Result<Value, String> {
+        codex_core::set_mcp_server_enabled_core(
+            &self.workspaces,
+            workspace_id.clone(),
+            server_name,
+            enabled,
+        )
+        .await?;
+        // Best-effort: reload config in the running app-server session.
+        let _ = codex_core::mcp_server_reload_core(&self.sessions, workspace_id).await;
+        Ok(json!({ "ok": true }))
+    }
+
+    async fn archive_thread(
+        &self,
+        workspace_id: String,
+        thread_id: String,
+    ) -> Result<Value, String> {
         codex_core::archive_thread_core(&self.sessions, workspace_id, thread_id).await
     }
 
@@ -849,8 +885,13 @@ impl DaemonState {
         request_id: Value,
         result: Value,
     ) -> Result<Value, String> {
-        codex_core::respond_to_server_request_core(&self.sessions, workspace_id, request_id, result)
-            .await?;
+        codex_core::respond_to_server_request_core(
+            &self.sessions,
+            workspace_id,
+            request_id,
+            result,
+        )
+        .await?;
         Ok(json!({ "ok": true }))
     }
 
@@ -1099,8 +1140,7 @@ fn create_workspace_file_inner(root: &PathBuf, relative_path: &str) -> Result<()
 
 fn create_workspace_dir_inner(root: &PathBuf, relative_path: &str) -> Result<(), String> {
     let path = resolve_workspace_path(root, relative_path)?;
-    std::fs::create_dir_all(&path)
-        .map_err(|err| format!("Failed to create directory: {err}"))?;
+    std::fs::create_dir_all(&path).map_err(|err| format!("Failed to create directory: {err}"))?;
     Ok(())
 }
 
@@ -1109,22 +1149,17 @@ fn delete_workspace_path_inner(root: &PathBuf, relative_path: &str) -> Result<()
     if !path.exists() {
         return Err("Path does not exist".to_string());
     }
-    let metadata = std::fs::metadata(&path)
-        .map_err(|err| format!("Failed to read metadata: {err}"))?;
+    let metadata =
+        std::fs::metadata(&path).map_err(|err| format!("Failed to read metadata: {err}"))?;
     if metadata.is_dir() {
-        std::fs::remove_dir_all(&path)
-            .map_err(|err| format!("Failed to remove folder: {err}"))?;
+        std::fs::remove_dir_all(&path).map_err(|err| format!("Failed to remove folder: {err}"))?;
     } else {
         std::fs::remove_file(&path).map_err(|err| format!("Failed to remove file: {err}"))?;
     }
     Ok(())
 }
 
-fn move_workspace_path_inner(
-    root: &PathBuf,
-    from_path: &str,
-    to_path: &str,
-) -> Result<(), String> {
+fn move_workspace_path_inner(root: &PathBuf, from_path: &str, to_path: &str) -> Result<(), String> {
     let from = resolve_workspace_path(root, from_path)?;
     let to = resolve_workspace_path(root, to_path)?;
     if let Some(parent) = to.parent() {
@@ -1166,8 +1201,7 @@ fn read_workspace_file_inner(
         buffer.truncate(MAX_WORKSPACE_FILE_BYTES as usize);
     }
 
-    let content =
-        String::from_utf8(buffer).map_err(|_| "File is not valid UTF-8".to_string())?;
+    let content = String::from_utf8(buffer).map_err(|_| "File is not valid UTF-8".to_string())?;
     Ok(WorkspaceFileResponse { content, truncated })
 }
 
@@ -1304,7 +1338,11 @@ async fn git_remote_branch_exists_live(
     }
 }
 
-async fn git_remote_branch_exists(repo_path: &PathBuf, remote: &str, branch: &str) -> Result<bool, String> {
+async fn git_remote_branch_exists(
+    repo_path: &PathBuf,
+    remote: &str,
+    branch: &str,
+) -> Result<bool, String> {
     let git_bin = resolve_git_binary().map_err(|e| format!("Failed to run git: {e}"))?;
     let status = Command::new(git_bin)
         .args([
@@ -1383,7 +1421,10 @@ async fn git_find_remote_for_branch(
     Ok(None)
 }
 
-async fn git_find_remote_tracking_branch(repo_path: &PathBuf, branch: &str) -> Result<Option<String>, String> {
+async fn git_find_remote_tracking_branch(
+    repo_path: &PathBuf,
+    branch: &str,
+) -> Result<Option<String>, String> {
     if git_remote_branch_exists(repo_path, "origin", branch).await? {
         return Ok(Some(format!("origin/{branch}")));
     }
@@ -1549,15 +1590,19 @@ fn build_error_response(id: Option<u64>, message: &str) -> Option<String> {
             "id": id,
             "error": { "message": message }
         }))
-        .unwrap_or_else(|_| "{\"id\":0,\"error\":{\"message\":\"serialization failed\"}}".to_string()),
+        .unwrap_or_else(|_| {
+            "{\"id\":0,\"error\":{\"message\":\"serialization failed\"}}".to_string()
+        }),
     )
 }
 
 fn build_result_response(id: Option<u64>, result: Value) -> Option<String> {
     let id = id?;
-    Some(serde_json::to_string(&json!({ "id": id, "result": result })).unwrap_or_else(|_| {
-        "{\"id\":0,\"error\":{\"message\":\"serialization failed\"}}".to_string()
-    }))
+    Some(
+        serde_json::to_string(&json!({ "id": id, "result": result })).unwrap_or_else(|_| {
+            "{\"id\":0,\"error\":{\"message\":\"serialization failed\"}}".to_string()
+        }),
+    )
 }
 
 fn build_event_notification(event: DaemonEvent) -> Option<String> {
@@ -1636,24 +1681,30 @@ fn parse_optional_bool(value: &Value, key: &str) -> Option<bool> {
 
 fn parse_optional_string_array(value: &Value, key: &str) -> Option<Vec<String>> {
     match value {
-        Value::Object(map) => map.get(key).and_then(|value| value.as_array()).map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item.as_str().map(|value| value.to_string()))
-                .collect::<Vec<_>>()
-        }),
+        Value::Object(map) => map
+            .get(key)
+            .and_then(|value| value.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| item.as_str().map(|value| value.to_string()))
+                    .collect::<Vec<_>>()
+            }),
         _ => None,
     }
 }
 
 fn parse_optional_string_map(value: &Value, key: &str) -> Option<HashMap<String, String>> {
     match value {
-        Value::Object(map) => map.get(key).and_then(|value| value.as_object()).map(|items| {
-            items
-                .iter()
-                .filter_map(|(k, v)| v.as_str().map(|value| (k.clone(), value.to_string())))
-                .collect::<HashMap<_, _>>()
-        }),
+        Value::Object(map) => map
+            .get(key)
+            .and_then(|value| value.as_object())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|(k, v)| v.as_str().map(|value| (k.clone(), value.to_string())))
+                    .collect::<HashMap<_, _>>()
+            }),
         _ => None,
     }
 }
@@ -1792,10 +1843,10 @@ async fn handle_rpc_request(
         "search_workspace_files" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
             let query = parse_string(&params, "query")?;
-            let include_globs = parse_optional_string_array(&params, "includeGlobs")
-                .unwrap_or_default();
-            let exclude_globs = parse_optional_string_array(&params, "excludeGlobs")
-                .unwrap_or_default();
+            let include_globs =
+                parse_optional_string_array(&params, "includeGlobs").unwrap_or_default();
+            let exclude_globs =
+                parse_optional_string_array(&params, "excludeGlobs").unwrap_or_default();
             let max_results = parse_optional_u32(&params, "maxResults").unwrap_or(200);
             let match_case = parse_optional_bool(&params, "matchCase").unwrap_or(false);
             let whole_word = parse_optional_bool(&params, "wholeWord").unwrap_or(false);
@@ -1847,7 +1898,7 @@ async fn handle_rpc_request(
             let response = state.read_workspace_file(workspace_id, path).await?;
             serde_json::to_value(response).map_err(|err| err.to_string())
         }
-"write_workspace_file" => {
+        "write_workspace_file" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
             let path = parse_string(&params, "path")?;
             let content = parse_string(&params, "content")?;
@@ -1947,7 +1998,33 @@ async fn handle_rpc_request(
             let workspace_id = parse_string(&params, "workspaceId")?;
             let cursor = parse_optional_string(&params, "cursor");
             let limit = parse_optional_u32(&params, "limit");
-            state.list_mcp_server_status(workspace_id, cursor, limit).await
+            state
+                .list_mcp_server_status(workspace_id, cursor, limit)
+                .await
+        }
+        "mcp_server_reload" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            state.mcp_server_reload(workspace_id).await
+        }
+        "mcp_server_oauth_login" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let server_name = parse_string(&params, "serverName")?;
+            state
+                .mcp_server_oauth_login(workspace_id, server_name)
+                .await
+        }
+        "list_configured_mcp_servers" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            state.list_configured_mcp_servers(workspace_id).await
+        }
+        "set_mcp_server_enabled" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let server_name = parse_string(&params, "serverName")?;
+            let enabled = parse_optional_bool(&params, "enabled")
+                .ok_or_else(|| "missing `enabled`".to_string())?;
+            state
+                .set_mcp_server_enabled(workspace_id, server_name, enabled)
+                .await
         }
         "archive_thread" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
@@ -1997,7 +2074,9 @@ async fn handle_rpc_request(
                 .cloned()
                 .ok_or("missing `target`")?;
             let delivery = parse_optional_string(&params, "delivery");
-            state.start_review(workspace_id, thread_id, target, delivery).await
+            state
+                .start_review(workspace_id, thread_id, target, delivery)
+                .await
         }
         "model_list" => {
             let workspace_id = parse_string(&params, "workspaceId")?;

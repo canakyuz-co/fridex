@@ -53,6 +53,7 @@ describe("useAppServerEvents", () => {
       onAgentMessageDelta: vi.fn(),
       onReasoningSummaryBoundary: vi.fn(),
       onPlanDelta: vi.fn(),
+      onMcpToolCallProgress: vi.fn(),
       onApprovalRequest: vi.fn(),
       onRequestUserInput: vi.fn(),
       onItemCompleted: vi.fn(),
@@ -114,6 +115,22 @@ describe("useAppServerEvents", () => {
       "thread-1",
       "plan-1",
       "- Step 1",
+    );
+
+    act(() => {
+      listener?.({
+        workspace_id: "ws-1",
+        message: {
+          method: "item/mcpToolCall/progress",
+          params: { threadId: "thread-1", itemId: "tool-1", delta: "50%" },
+        },
+      });
+    });
+    expect(handlers.onMcpToolCallProgress).toHaveBeenCalledWith(
+      "ws-1",
+      "thread-1",
+      "tool-1",
+      "50%",
     );
 
     act(() => {
