@@ -12,6 +12,43 @@ import type {
 import { formatRelativeTime } from "../../../utils/time";
 import { getGitHubIssues } from "../../../services/tauri";
 
+type ExternalRef = {
+  label: string;
+  url: string;
+};
+
+const extractExternalRefs = (content: string): ExternalRef[] => {
+  const refs: ExternalRef[] = [];
+  const seen = new Set<string>();
+
+  const githubIssueRegex =
+    /https?:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/(\d+)(?:[^\s]*)/gi;
+  const linearIssueRegex =
+    /https?:\/\/linear\.app\/[^/\s]+\/issue\/([A-Z][A-Z0-9]+-\d+)(?:[^\s]*)/g;
+
+  const push = (label: string, url: string) => {
+    if (seen.has(url)) {
+      return;
+    }
+    seen.add(url);
+    refs.push({ label, url });
+  };
+
+  for (const match of content.matchAll(githubIssueRegex)) {
+    const url = match[0];
+    const number = match[1];
+    push(`GH #${number}`, url);
+  }
+
+  for (const match of content.matchAll(linearIssueRegex)) {
+    const url = match[0];
+    const key = match[1];
+    push(key, url);
+  }
+
+  return refs;
+};
+
 type LatestAgentRun = {
   message: string;
   timestamp: number;
@@ -747,6 +784,17 @@ export function Home({
                             : "Global"}
                         </span>
                       )}
+                      {extractExternalRefs(task.content).map((ref) => (
+                        <a
+                          key={ref.url}
+                          className="home-tasks-ref"
+                          href={ref.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {ref.label}
+                        </a>
+                      ))}
                       <span className="home-tasks-updated">
                         Updated {formatRelativeTime(task.updatedAt)}
                       </span>
@@ -827,6 +875,17 @@ export function Home({
                                   : "Global"}
                               </span>
                             )}
+                            {extractExternalRefs(task.content).map((ref) => (
+                              <a
+                                key={ref.url}
+                                className="home-tasks-ref"
+                                href={ref.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {ref.label}
+                              </a>
+                            ))}
                             <span className="home-tasks-updated">
                               Updated {formatRelativeTime(task.updatedAt)}
                             </span>
