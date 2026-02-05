@@ -785,20 +785,6 @@ export function FileTreePanel({
                   ? "No modified"
                   : "No files"}
           </div>
-          {showCreateActions ? (
-            <div className="file-tree-actions" role="group" aria-label="Create">
-              <button
-                type="button"
-                className="ghost icon-button"
-                onClick={(event) => void showCreateMenu(event)}
-                aria-label="Create"
-                title="Create"
-                disabled={actionBusy}
-              >
-                <Plus size={14} aria-hidden />
-              </button>
-            </div>
-          ) : null}
           {hasFolders ? (
             <button
               type="button"
