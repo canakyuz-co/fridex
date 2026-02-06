@@ -11,7 +11,9 @@
 % --- PAGE / LANGUAGE ---
 \usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2cm, right=2cm]{geometry}
 \usepackage{fontspec}
-\usepackage[turkish, english, bidi=basic, provide=*]{babel}
+% NOTE: We compile with XeLaTeX/Tectonic (XeTeX). Babel's `bidi=basic` requires LuaLaTeX.
+% Turkish is LTR, so we keep bidi off for engine compatibility.
+\usepackage[main=turkish, english]{babel}
 
 % Avoid system-font dependencies; TeX Gyre ships with TeX distributions.
 \setmainfont{TeX Gyre Heros}
@@ -362,4 +364,3 @@ FridayX bu temsilin üretimde \textbf{daha şeffaf, daha güvenli ve daha hızl�
 \end{center}
 
 \end{document}
-
