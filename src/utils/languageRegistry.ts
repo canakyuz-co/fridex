@@ -17,6 +17,7 @@ const LANGUAGE_REGISTRY: LanguageSpec[] = [
   { id: "json", extensions: ["json"], monaco: "json" },
   { id: "jsx", extensions: ["jsx"], monaco: "javascript" },
   { id: "kotlin", extensions: ["kt"] },
+  { id: "latex", extensions: ["tex"], monaco: "latex" },
   { id: "markdown", extensions: ["md"], monaco: "markdown" },
   { id: "php", extensions: ["php"] },
   { id: "prisma", extensions: ["prisma"], monaco: "prisma" },

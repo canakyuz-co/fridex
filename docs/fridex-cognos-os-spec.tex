@@ -10,15 +10,15 @@
 
 % --- PAGE / LANGUAGE ---
 \usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2cm, right=2cm]{geometry}
-\usepackage{fontspec}
+% Keep fonts portable across engines/bundles used by FridayX preview.
+% Avoid `fontspec` here: it depends on system font discovery and can fail in sandboxed/bundled engines.
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
 % NOTE: We compile with XeLaTeX/Tectonic (XeTeX). Babel's `bidi=basic` requires LuaLaTeX.
 % Turkish is LTR, so we keep bidi off for engine compatibility.
 \usepackage[main=turkish, english]{babel}
 
-% Avoid system-font dependencies; TeX Gyre ships with TeX distributions.
-\setmainfont{TeX Gyre Heros}
-\setsansfont{TeX Gyre Heros}
-\setmonofont{TeX Gyre Cursor}
+% NOTE: Default LaTeX fonts (Latin Modern via lmodern) are used for maximum compatibility.
 
 % --- MATH / BOXES / LAYOUT ---
 \usepackage{amsmath}
