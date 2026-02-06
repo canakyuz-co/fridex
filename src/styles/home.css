@@ -470,7 +470,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.home-tasks-controls::-webkit-scrollbar {
+  display: none;
 }
 
 .home-tasks-controls-left,
@@ -478,12 +484,12 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .home-tasks-search-wrap {
-  min-width: 220px;
   flex: 1;
+  min-width: 180px;
 }
 
 .home-tasks-search-input {
@@ -860,12 +866,21 @@
 }
 
 .home-tasks-board {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  align-items: stretch;
   gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+
+.home-tasks-board::-webkit-scrollbar {
+  display: none;
 }
 
 .home-tasks-column {
+  flex: 1 0 280px;
   padding: 12px;
   border-radius: 14px;
   border: 1px solid var(--border-subtle);
@@ -874,6 +889,7 @@
   flex-direction: column;
   gap: 10px;
   min-height: 220px;
+  scroll-snap-align: start;
 }
 
 .home-tasks-column.is-drop-target {
@@ -902,10 +918,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  cursor: grab;
+  touch-action: none;
 }
 
 .home-tasks-card.is-dragging {
   opacity: 0.6;
+  cursor: grabbing;
 }
 
 .home-tasks-card-header {
@@ -1028,7 +1047,9 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  z-index: 1000;
+  z-index: 2000;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .home-task-dialog {
@@ -1421,10 +1442,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .home-tasks-board {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .home-usage-chart {
     grid-template-columns: repeat(7, minmax(0, 1fr));
   }
@@ -1447,11 +1464,6 @@
     align-items: stretch;
   }
 
-  .home-tasks-controls {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
   .home-usage-control-group {
     width: 100%;
     justify-content: space-between;
@@ -1461,9 +1473,6 @@
     max-width: 100%;
   }
 
-  .home-tasks-board {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .home-actions {

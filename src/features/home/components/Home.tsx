@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import Plus from "lucide-react/dist/esm/icons/plus";
@@ -160,12 +161,20 @@ export function Home({
 }: HomeProps) {
   const [activeTab, setActiveTab] = useState<"tasks" | "usage">("tasks");
   const [taskQuery, setTaskQuery] = useState("");
-  const [taskSort, setTaskSort] = useState<"updated" | "created" | "title">("updated");
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [taskDialog, setTaskDialog] = useState<TaskDialogState | null>(null);
   const [githubIssueDraft, setGitHubIssueDraft] = useState("");
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null);
+  const [isPointerDraggingTask, setIsPointerDraggingTask] = useState(false);
+  const pointerDragRef = useRef<{
+    taskId: string;
+    fromStatus: TaskStatus;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    hasMoved: boolean;
+  } | null>(null);
 
   const taskWorkspaceLabelById = useMemo(() => {
     const map = new Map<string, string>();
@@ -189,18 +198,10 @@ export function Home({
       : tasks;
 
     const sorted = [...filtered];
-    if (taskSort === "title") {
-      sorted.sort((a, b) => a.title.localeCompare(b.title));
-      return sorted;
-    }
-    if (taskSort === "created") {
-      sorted.sort((a, b) => b.createdAt - a.createdAt);
-      return sorted;
-    }
     // Default: updated desc.
     sorted.sort((a, b) => b.updatedAt - a.updatedAt);
     return sorted;
-  }, [taskQuery, taskSort, tasks]);
+  }, [taskQuery, tasks]);
 
   const tasksByStatus = useMemo(() => {
     const grouped: Record<TaskStatus, TaskEntry[]> = {
@@ -241,6 +242,80 @@ export function Home({
     setTaskDialog(null);
     setGitHubIssueDraft("");
   };
+
+  useEffect(() => {
+    if (!taskDialog) {
+      return;
+    }
+
+    // Avoid scrolling the underlying page while a modal is open.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [taskDialog]);
+
+  useEffect(() => {
+    if (!isPointerDraggingTask) {
+      return;
+    }
+
+    const getStatusFromPoint = (x: number, y: number): TaskStatus | null => {
+      const element = document.elementFromPoint(x, y) as HTMLElement | null;
+      const column = element?.closest?.(".home-tasks-column") as HTMLElement | null;
+      const next = column?.dataset?.status ?? null;
+      if (next === "todo" || next === "doing" || next === "done") {
+        return next;
+      }
+      return null;
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const state = pointerDragRef.current;
+      if (!state || event.pointerId !== state.pointerId) {
+        return;
+      }
+
+      const dx = event.clientX - state.startX;
+      const dy = event.clientY - state.startY;
+      if (!state.hasMoved && dx * dx + dy * dy < 16) {
+        return;
+      }
+      if (!state.hasMoved) {
+        state.hasMoved = true;
+      }
+
+      setDragOverStatus(getStatusFromPoint(event.clientX, event.clientY));
+    };
+
+    const handlePointerUp = (event: PointerEvent) => {
+      const state = pointerDragRef.current;
+      if (!state || event.pointerId !== state.pointerId) {
+        return;
+      }
+
+      const nextStatus = getStatusFromPoint(event.clientX, event.clientY);
+      pointerDragRef.current = null;
+      setIsPointerDraggingTask(false);
+      setDraggingTaskId(null);
+      setDragOverStatus(null);
+
+      if (!state.hasMoved || !nextStatus || nextStatus === state.fromStatus) {
+        return;
+      }
+      void onTaskStatusChange(state.taskId, nextStatus);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+  }, [isPointerDraggingTask, onTaskStatusChange]);
 
   const toggleTaskExpanded = (taskId: string) => {
     setExpandedTasks((prev) => {
@@ -581,20 +656,6 @@ export function Home({
                       ))}
                     </select>
                   </div>
-                  <div className="home-usage-select-wrap">
-                    <select
-                      className="home-usage-select"
-                      value={taskSort}
-                      onChange={(event) =>
-                        setTaskSort(event.target.value as typeof taskSort)
-                      }
-                      aria-label="Sort tasks"
-                    >
-                      <option value="updated">Updated</option>
-                      <option value="created">Created</option>
-                      <option value="title">Title</option>
-                    </select>
-                  </div>
                 </div>
                 <div className="home-tasks-controls-right">
                   <div className="home-usage-select-wrap home-tasks-search-wrap">
@@ -720,23 +781,7 @@ export function Home({
                       draggingTaskId && dragOverStatus === status ? " is-drop-target" : ""
                     }`}
                     key={status}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      setDragOverStatus(status);
-                    }}
-                    onDragLeave={() => {
-                      setDragOverStatus((prev) => (prev === status ? null : prev));
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      const taskId = event.dataTransfer.getData("text/plain").trim();
-                      if (!taskId) {
-                        return;
-                      }
-                      void onTaskStatusChange(taskId, status);
-                      setDraggingTaskId(null);
-                      setDragOverStatus(null);
-                    }}
+                    data-status={status}
                   >
                     <div className="home-tasks-column-title">
                       {(status === "todo"
@@ -749,18 +794,39 @@ export function Home({
                       {tasksByStatus[status].map((task) => (
                         <div
                           className={`home-tasks-card${
-                            draggingTaskId === task.id ? " is-dragging" : ""
+                            isPointerDraggingTask && draggingTaskId === task.id
+                              ? " is-dragging"
+                              : ""
                           }`}
                           key={task.id}
-                          draggable
-                          onDragStart={(event) => {
-                            event.dataTransfer.setData("text/plain", task.id);
+                          onPointerDown={(event) => {
+                            if (event.button !== 0) {
+                              return;
+                            }
+
+                            const target = event.target as HTMLElement | null;
+                            if (
+                              target?.closest?.(
+                                "button, a, input, textarea, select, [role='button']",
+                              )
+                            ) {
+                              return;
+                            }
+
+                            pointerDragRef.current = {
+                              taskId: task.id,
+                              fromStatus: task.status,
+                              pointerId: event.pointerId,
+                              startX: event.clientX,
+                              startY: event.clientY,
+                              hasMoved: false,
+                            };
                             setDraggingTaskId(task.id);
                             setDragOverStatus(status);
-                          }}
-                          onDragEnd={() => {
-                            setDraggingTaskId(null);
-                            setDragOverStatus(null);
+                            setIsPointerDraggingTask(true);
+                            (event.currentTarget as HTMLElement).setPointerCapture?.(
+                              event.pointerId,
+                            );
                           }}
                         >
                           <div className="home-tasks-card-header">
@@ -835,226 +901,227 @@ export function Home({
                 ))}
               </div>
             )}
-            {taskDialog && (
-              <div
-                className="home-task-dialog-backdrop"
-                role="presentation"
-                onMouseDown={(event) => {
-                  if (event.target === event.currentTarget) {
-                    closeTaskDialog();
-                  }
-                }}
-              >
+            {taskDialog &&
+              createPortal(
                 <div
-                  className="home-task-dialog"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label={taskDialog.mode === "create" ? "New task" : "Edit task"}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                      event.preventDefault();
+                  className="home-task-dialog-backdrop"
+                  role="presentation"
+                  onMouseDown={(event) => {
+                    if (event.target === event.currentTarget) {
                       closeTaskDialog();
-                      return;
-                    }
-                    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                      event.preventDefault();
-                      void saveTaskDialog();
                     }
                   }}
                 >
-                  <div className="home-task-dialog-header">
-                    <div className="home-task-dialog-title">
-                      {taskDialog.mode === "create" ? "New task" : "Edit task"}
-                    </div>
-                    <button
-                      type="button"
-                      className="ghost icon-button"
-                      onClick={closeTaskDialog}
-                      aria-label="Close"
-                      title="Close"
-                    >
-                      <X size={14} aria-hidden />
-                    </button>
-                  </div>
-
-                  <div className="home-task-dialog-body">
-                    <div className="home-task-dialog-row">
-                      <div className="home-task-dialog-field">
-                        <div className="home-task-dialog-label">Status</div>
-                        <div className="home-task-dialog-status">
-                          {(["todo", "doing", "done"] as TaskStatus[]).map((status) => (
-                            <button
-                              key={status}
-                              type="button"
-                              className={
-                                taskDialog.status === status
-                                  ? "home-task-dialog-status-button is-active"
-                                  : "home-task-dialog-status-button"
-                              }
-                              onClick={() =>
-                                setTaskDialog((prev) =>
-                                  prev ? { ...prev, status } : prev,
-                                )
-                              }
-                              aria-pressed={taskDialog.status === status}
-                            >
-                              {status === "todo"
-                                ? "To do"
-                                : status === "doing"
-                                  ? "Doing"
-                                  : "Done"}
-                            </button>
-                          ))}
-                        </div>
+                  <div
+                    className="home-task-dialog"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={taskDialog.mode === "create" ? "New task" : "Edit task"}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        closeTaskDialog();
+                        return;
+                      }
+                      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                        event.preventDefault();
+                        void saveTaskDialog();
+                      }
+                    }}
+                  >
+                    <div className="home-task-dialog-header">
+                      <div className="home-task-dialog-title">
+                        {taskDialog.mode === "create" ? "New task" : "Edit task"}
                       </div>
+                      <button
+                        type="button"
+                        className="ghost icon-button"
+                        onClick={closeTaskDialog}
+                        aria-label="Close"
+                        title="Close"
+                      >
+                        <X size={14} aria-hidden />
+                      </button>
+                    </div>
 
-                      {taskDialog.mode === "create" ? (
+                    <div className="home-task-dialog-body">
+                      <div className="home-task-dialog-row">
                         <div className="home-task-dialog-field">
-                          <div className="home-task-dialog-label">Project</div>
-                          <select
-                            className="home-task-dialog-select"
-                            value={taskDialog.workspaceId ?? ""}
-                            onChange={(event) => {
-                              const next = event.target.value || null;
-                              setTaskDialog((prev) =>
-                                prev ? { ...prev, workspaceId: next } : prev,
-                              );
-                            }}
-                          >
-                            <option value="">Global</option>
-                            {tasksWorkspaceOptions
-                              .filter((option) => option.id)
-                              .map((option) => (
-                                <option key={option.id} value={option.id}>
-                                  {option.label}
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-                      ) : (
-                        <div className="home-task-dialog-field">
-                          <div className="home-task-dialog-label">Project</div>
-                          <div className="home-task-dialog-static">
-                            {taskDialog.workspaceId
-                              ? taskWorkspaceLabelById.get(taskDialog.workspaceId) ?? "Unknown"
-                              : "Global"}
+                          <div className="home-task-dialog-label">Status</div>
+                          <div className="home-task-dialog-status">
+                            {(["todo", "doing", "done"] as TaskStatus[]).map((status) => (
+                              <button
+                                key={status}
+                                type="button"
+                                className={
+                                  taskDialog.status === status
+                                    ? "home-task-dialog-status-button is-active"
+                                    : "home-task-dialog-status-button"
+                                }
+                                onClick={() =>
+                                  setTaskDialog((prev) =>
+                                    prev ? { ...prev, status } : prev,
+                                  )
+                                }
+                                aria-pressed={taskDialog.status === status}
+                              >
+                                {status === "todo"
+                                  ? "To do"
+                                  : status === "doing"
+                                    ? "Doing"
+                                    : "Done"}
+                              </button>
+                            ))}
                           </div>
                         </div>
-                      )}
-                    </div>
 
-                    <div className="home-task-dialog-field">
-                      <div className="home-task-dialog-label">Title</div>
-                      <input
-                        className="home-task-dialog-input"
-                        value={taskDialog.title}
-                        onChange={(event) =>
-                          setTaskDialog((prev) =>
-                            prev ? { ...prev, title: event.target.value } : prev,
-                          )
-                        }
-                        placeholder="What needs to get done?"
-                      />
-                    </div>
-
-                    <div className="home-task-dialog-field">
-                      <div className="home-task-dialog-label">Details</div>
-                      <textarea
-                        className="home-task-dialog-textarea"
-                        value={taskDialog.content}
-                        onChange={(event) =>
-                          setTaskDialog((prev) =>
-                            prev ? { ...prev, content: event.target.value } : prev,
-                          )
-                        }
-                        placeholder="Add context, links, acceptance criteria…"
-                        rows={8}
-                      />
-                    </div>
-
-                    <div className="home-task-dialog-field">
-                      <div className="home-task-dialog-label">GitHub issues</div>
-                      <div className="home-task-dialog-inline">
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={() => void handleLoadGitHubIssues()}
-                          disabled={!taskDialog.workspaceId || githubIssuesLoading}
-                        >
-                          {githubIssuesLoading ? "Loading…" : "Load"}
-                        </button>
-                        {githubIssuesError && (
-                          <span className="home-tasks-error">{githubIssuesError}</span>
-                        )}
-                      </div>
-                      {taskDialog.showGitHubIssues && githubIssues.length > 0 && (
-                        <div className="home-task-dialog-issues">
-                          {githubIssues.map((issue) => (
-                            <button
-                              key={issue.url}
-                              type="button"
-                              className={
-                                githubIssueDraft === String(issue.number)
-                                  ? "home-task-dialog-issue is-active"
-                                  : "home-task-dialog-issue"
-                              }
-                              onClick={() => {
-                                setGitHubIssueDraft(String(issue.number));
-                                setTaskDialog((prev) => {
-                                  if (!prev) {
-                                    return prev;
-                                  }
-                                  const linkLine = `GitHub: ${issue.url}`;
-                                  const nextContent = prev.content.includes(issue.url)
-                                    ? prev.content
-                                    : prev.content.trim().length > 0
-                                      ? `${linkLine}\n\n${prev.content.trim()}`
-                                      : linkLine;
-                                  return {
-                                    ...prev,
-                                    title: issue.title,
-                                    content: nextContent,
-                                  };
-                                });
+                        {taskDialog.mode === "create" ? (
+                          <div className="home-task-dialog-field">
+                            <div className="home-task-dialog-label">Project</div>
+                            <select
+                              className="home-task-dialog-select"
+                              value={taskDialog.workspaceId ?? ""}
+                              onChange={(event) => {
+                                const next = event.target.value || null;
+                                setTaskDialog((prev) =>
+                                  prev ? { ...prev, workspaceId: next } : prev,
+                                );
                               }}
                             >
-                              <span className="home-task-dialog-issue-number">
-                                #{issue.number}
-                              </span>
-                              <span className="home-task-dialog-issue-title">
-                                {issue.title}
-                              </span>
-                            </button>
-                          ))}
+                              <option value="">Global</option>
+                              {tasksWorkspaceOptions
+                                .filter((option) => option.id)
+                                .map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <div className="home-task-dialog-field">
+                            <div className="home-task-dialog-label">Project</div>
+                            <div className="home-task-dialog-static">
+                              {taskDialog.workspaceId
+                                ? taskWorkspaceLabelById.get(taskDialog.workspaceId) ??
+                                  "Unknown"
+                                : "Global"}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="home-task-dialog-field">
+                        <div className="home-task-dialog-label">Title</div>
+                        <input
+                          className="home-task-dialog-input"
+                          value={taskDialog.title}
+                          onChange={(event) =>
+                            setTaskDialog((prev) =>
+                              prev ? { ...prev, title: event.target.value } : prev,
+                            )
+                          }
+                          placeholder="What needs to get done?"
+                        />
+                      </div>
+
+                      <div className="home-task-dialog-field">
+                        <div className="home-task-dialog-label">Details</div>
+                        <textarea
+                          className="home-task-dialog-textarea"
+                          value={taskDialog.content}
+                          onChange={(event) =>
+                            setTaskDialog((prev) =>
+                              prev ? { ...prev, content: event.target.value } : prev,
+                            )
+                          }
+                          placeholder="Add context, links, acceptance criteria…"
+                          rows={8}
+                        />
+                      </div>
+
+                      <div className="home-task-dialog-field">
+                        <div className="home-task-dialog-label">GitHub issues</div>
+                        <div className="home-task-dialog-inline">
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => void handleLoadGitHubIssues()}
+                            disabled={!taskDialog.workspaceId || githubIssuesLoading}
+                          >
+                            {githubIssuesLoading ? "Loading…" : "Load"}
+                          </button>
+                          {githubIssuesError && (
+                            <span className="home-tasks-error">{githubIssuesError}</span>
+                          )}
                         </div>
-                      )}
-                      {!taskDialog.workspaceId && (
-                        <div className="home-task-dialog-hint">
-                          Select a project to load GitHub issues.
-                        </div>
-                      )}
+                        {taskDialog.showGitHubIssues && githubIssues.length > 0 && (
+                          <div className="home-task-dialog-issues">
+                            {githubIssues.map((issue) => (
+                              <button
+                                key={issue.url}
+                                type="button"
+                                className={
+                                  githubIssueDraft === String(issue.number)
+                                    ? "home-task-dialog-issue is-active"
+                                    : "home-task-dialog-issue"
+                                }
+                                onClick={() => {
+                                  setGitHubIssueDraft(String(issue.number));
+                                  setTaskDialog((prev) => {
+                                    if (!prev) {
+                                      return prev;
+                                    }
+                                    const linkLine = `GitHub: ${issue.url}`;
+                                    const nextContent = prev.content.includes(issue.url)
+                                      ? prev.content
+                                      : prev.content.trim().length > 0
+                                        ? `${linkLine}\n\n${prev.content.trim()}`
+                                        : linkLine;
+                                    return {
+                                      ...prev,
+                                      title: issue.title,
+                                      content: nextContent,
+                                    };
+                                  });
+                                }}
+                              >
+                                <span className="home-task-dialog-issue-number">
+                                  #{issue.number}
+                                </span>
+                                <span className="home-task-dialog-issue-title">
+                                  {issue.title}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {!taskDialog.workspaceId && (
+                          <div className="home-task-dialog-hint">
+                            Select a project to load GitHub issues.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="home-task-dialog-actions">
+                      {tasksError && <div className="home-tasks-error">{tasksError}</div>}
+                      <button type="button" className="ghost" onClick={closeTaskDialog}>
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="primary"
+                        onClick={() => void saveTaskDialog()}
+                        disabled={!canSaveTaskDialog}
+                      >
+                        {taskDialog.mode === "create" ? "Create" : "Save"}
+                      </button>
                     </div>
                   </div>
-
-                  <div className="home-task-dialog-actions">
-                    {tasksError && (
-                      <div className="home-tasks-error">{tasksError}</div>
-                    )}
-                    <button type="button" className="ghost" onClick={closeTaskDialog}>
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="primary"
-                      onClick={() => void saveTaskDialog()}
-                      disabled={!canSaveTaskDialog}
-                    >
-                      {taskDialog.mode === "create" ? "Create" : "Save"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+                </div>,
+                document.body,
+              )}
           </div>
         ) : (
           <div className="home-usage" role="tabpanel">
