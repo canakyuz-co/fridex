@@ -26,6 +26,13 @@ export function LatexPreview({ workspaceId, path, source }: LatexPreviewProps) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const urlRef = useRef<string | null>(null);
   const requestIdRef = useRef(0);
+  const inFlightRef = useRef<Promise<void> | null>(null);
+  const pendingRef = useRef<LatexPreviewProps | null>(null);
+  const pendingKeyRef = useRef<string | null>(null);
+  const lastCompiledKeyRef = useRef<string | null>(null);
+  const debounceRef = useRef<number | null>(null);
+
+  const CLIENT_COMPILE_TIMEOUT_MS = 70_000;
 
   const formatError = (err: unknown) => {
     if (err instanceof Error) return err.message;
@@ -42,14 +49,54 @@ export function LatexPreview({ workspaceId, path, source }: LatexPreviewProps) {
     return "Derleme hatasi";
   };
 
+  const getDebounceMs = (nextSource: string) => {
+    const size = nextSource.length;
+    if (size < 8_000) return 450;
+    if (size < 20_000) return 700;
+    if (size < 50_000) return 1_200;
+    return 1_800;
+  };
+
   useEffect(() => {
     // Debounce compile to keep typing smooth.
     setStatus("compiling");
     setError(null);
-    const requestId = ++requestIdRef.current;
 
-    const handle = window.setTimeout(() => {
-      latexCompile(workspaceId, path, source)
+    const key = `${workspaceId}::${path}::${source}`;
+    pendingRef.current = { workspaceId, path, source };
+    pendingKeyRef.current = key;
+
+    const scheduleCompile = (next: LatexPreviewProps, nextKey: string) => {
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+      }
+      const delay = getDebounceMs(next.source);
+      debounceRef.current = window.setTimeout(() => {
+        if (inFlightRef.current) return;
+        if (nextKey === lastCompiledKeyRef.current) {
+          pendingRef.current = null;
+          pendingKeyRef.current = null;
+          return;
+        }
+        pendingRef.current = null;
+        pendingKeyRef.current = null;
+        startCompile(next, nextKey);
+      }, delay);
+    };
+
+    const startCompile = (next: LatexPreviewProps, nextKey: string) => {
+      const requestId = ++requestIdRef.current;
+      setStatus("compiling");
+      setError(null);
+
+      const compilePromise = Promise.race([
+        latexCompile(next.workspaceId, next.path, next.source),
+        new Promise<never>((_, reject) => {
+          window.setTimeout(() => {
+            reject(new Error(`Derleme zaman asimi (${CLIENT_COMPILE_TIMEOUT_MS / 1000}s).`));
+          }, CLIENT_COMPILE_TIMEOUT_MS);
+        }),
+      ])
         .then((res) => {
           if (requestId !== requestIdRef.current) return;
           setDiagnostics(res.diagnostics ?? []);
@@ -62,15 +109,32 @@ export function LatexPreview({ workspaceId, path, source }: LatexPreviewProps) {
           urlRef.current = nextUrl;
           setPdfUrl(nextUrl);
           setStatus("ready");
+          lastCompiledKeyRef.current = nextKey;
         })
         .catch((err: unknown) => {
           if (requestId !== requestIdRef.current) return;
           setError(formatError(err));
           setStatus("error");
+        })
+        .finally(() => {
+          if (inFlightRef.current === compilePromise) {
+            inFlightRef.current = null;
+          }
+          if (pendingRef.current && pendingKeyRef.current) {
+            scheduleCompile(pendingRef.current, pendingKeyRef.current);
+          }
         });
-    }, 450);
 
-    return () => window.clearTimeout(handle);
+      inFlightRef.current = compilePromise;
+    };
+
+    scheduleCompile({ workspaceId, path, source }, key);
+
+    return () => {
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+      }
+    };
   }, [workspaceId, path, source]);
 
   useEffect(() => {
