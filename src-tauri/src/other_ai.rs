@@ -152,6 +152,34 @@ fn collect_models_from_text(provider: &str, output: &str) -> Vec<String> {
     models
 }
 
+fn list_claude_models_via_prompt(
+    command: &str,
+    env: &Option<HashMap<String, String>>,
+) -> Result<Vec<String>, String> {
+    let prompt = "List the available Claude model IDs for this account. \
+Return ONLY a JSON array of model IDs.";
+    let args = [
+        "-p",
+        "--output-format",
+        "json",
+        "--input-format",
+        "text",
+        prompt,
+    ];
+    let stdout = run_cli_with_env(command, &args, env)?;
+    let parsed = serde_json::from_str::<Value>(&stdout).ok();
+    let mut models = if let Some(payload) = parsed {
+        collect_models_from_json("claude", &payload)
+    } else {
+        collect_models_from_text("claude", &stdout)
+    };
+    models = collect_unique_models(models);
+    if models.is_empty() {
+        return Err("Claude CLI returned no models.".to_string());
+    }
+    Ok(models)
+}
+
 fn run_cli_with_env(
     command: &str,
     args: &[&str],
@@ -187,7 +215,7 @@ fn list_models_via_cli(
     env: &Option<HashMap<String, String>>,
 ) -> Result<Vec<String>, String> {
     if provider == "claude" {
-        return Err("Claude CLI does not expose a non-interactive model list.".to_string());
+        return list_claude_models_via_prompt(command, env);
     }
     let attempts: Vec<Vec<&str>> = vec![
         vec!["models", "list", "--output-format", "json"],

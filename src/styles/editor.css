@@ -54,8 +54,8 @@
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
+  gap: 4px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border-muted);
   background: var(--surface-topbar);
 }
@@ -85,12 +85,17 @@
 .editor-tab {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 10px;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 8px;
   background: var(--surface-card);
   color: var(--text-muted);
   border: 1px solid transparent;
+}
+
+.editor-tab:hover {
+  color: var(--text-strong);
+  border-color: var(--border-subtle);
 }
 
 .editor-tab.is-active {

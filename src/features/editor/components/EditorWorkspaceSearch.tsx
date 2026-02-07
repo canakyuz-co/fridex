@@ -333,14 +333,14 @@ export function EditorWorkspaceSearch({
                     <Hash size={14} aria-hidden />
                   </div>
                   <div className="editor-workspace-search__result-path">
-                    {result.path}
+                    {highlightMatch(result.lineText, result.matchText)}
                   </div>
                   <div className="editor-workspace-search__result-line">
                     <span className="editor-workspace-search__result-loc">
                       {result.line}:{result.column}
                     </span>
                     <span className="editor-workspace-search__result-text">
-                      {highlightMatch(result.lineText, result.matchText)}
+                      {result.path}
                     </span>
                   </div>
                 </button>
