@@ -24,7 +24,6 @@ import "monaco-editor/esm/vs/language/html/monaco.contribution";
 import "monaco-editor/esm/vs/language/json/monaco.contribution";
 import "monaco-editor/esm/vs/language/typescript/monaco.contribution";
 import "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution";
-import "monaco-editor/esm/vs/basic-languages/latex/latex.contribution";
 import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution";
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution";
 
@@ -139,6 +138,68 @@ function configureMonaco(_monaco: Monaco) {
       return new editorWorker();
     },
   };
+}
+
+function ensureLatexLanguage(monaco: Monaco) {
+  const hasLatex = monaco.languages
+    .getLanguages()
+    .some((lang: { id: string }) => lang.id === "latex");
+  if (hasLatex) {
+    return;
+  }
+
+  monaco.languages.register({ id: "latex" });
+
+  monaco.languages.setLanguageConfiguration("latex", {
+    comments: { lineComment: "%" },
+    brackets: [
+      ["{", "}"],
+      ["[", "]"],
+      ["(", ")"],
+    ],
+    autoClosingPairs: [
+      { open: "{", close: "}" },
+      { open: "[", close: "]" },
+      { open: "(", close: ")" },
+      { open: "\"", close: "\"" },
+    ],
+    surroundingPairs: [
+      { open: "{", close: "}" },
+      { open: "[", close: "]" },
+      { open: "(", close: ")" },
+      { open: "\"", close: "\"" },
+    ],
+  });
+
+  // Minimal Monarch tokenizer: enough to make LaTeX feel like a real mode.
+  monaco.languages.setMonarchTokensProvider("latex", {
+    defaultToken: "",
+    tokenizer: {
+      root: [
+        [/%.*$/, "comment"],
+        [/\\[a-zA-Z@]+[*]?/, "keyword"],
+        [/\\[^a-zA-Z@]/, "keyword"], // escaped special char like \{ or \%
+        [/\$\$/, { token: "delimiter", next: "@displaymath" }],
+        [/\$/, { token: "delimiter", next: "@inlinemath" }],
+        [/[{}[\]()]/, "@brackets"],
+        [/[-+*/=<>]+/, "operator"],
+      ],
+      inlinemath: [
+        [/\$/, { token: "delimiter", next: "@pop" }],
+        [/\\[a-zA-Z@]+[*]?/, "keyword"],
+        [/[_^]/, "operator"],
+        [/[{}[\]()]/, "@brackets"],
+        [/[^$\\]+/, "number"],
+      ],
+      displaymath: [
+        [/\$\$/, { token: "delimiter", next: "@pop" }],
+        [/\\[a-zA-Z@]+[*]?/, "keyword"],
+        [/[_^]/, "operator"],
+        [/[{}[\]()]/, "@brackets"],
+        [/[^$\\]+/, "number"],
+      ],
+    },
+  });
 }
 
 export function EditorView({
@@ -333,6 +394,7 @@ export function EditorView({
 
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     configureMonaco(monaco);
+    ensureLatexLanguage(monaco);
     monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
       noSemanticValidation: true,
       noSyntaxValidation: true,
