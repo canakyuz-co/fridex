@@ -10,10 +10,13 @@
 
 % --- PAGE / LANGUAGE ---
 \usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2cm, right=2cm]{geometry}
-% Keep fonts portable across engines/bundles used by FridayX preview.
-% Avoid `fontspec` here: it depends on system font discovery and can fail in sandboxed/bundled engines.
-\usepackage[T1]{fontenc}
-\usepackage{lmodern}
+% XeLaTeX/Tectonic preview needs Unicode-capable fonts for Turkish characters.
+% Use Latin Modern OpenType fonts shipped with TeX distributions (no OS font dependency).
+\usepackage{fontspec}
+\defaultfontfeatures{Ligatures=TeX}
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont{Latin Modern Mono}
 % NOTE: We compile with XeLaTeX/Tectonic (XeTeX). Babel's `bidi=basic` requires LuaLaTeX.
 % Turkish is LTR, so we keep bidi off for engine compatibility.
 \usepackage[main=turkish, english]{babel}
@@ -44,44 +47,45 @@
 \onehalfspacing
 
 % --- BRAND PALETTE ---
-\definecolor{fridex_cyan}{RGB}{0, 191, 255}
-\definecolor{fridex_navy}{RGB}{10, 20, 30}
-\definecolor{math_bg}{RGB}{245, 252, 255}
+% Avoid underscores in color names (underscore triggers "Missing $ inserted" in text mode).
+\definecolor{fridexCyan}{RGB}{0, 191, 255}
+\definecolor{fridexNavy}{RGB}{10, 20, 30}
+\definecolor{mathBg}{RGB}{245, 252, 255}
 
 % --- TITLES ---
 \titleformat{\chapter}[display]
-  {\normalfont\bfseries\color{fridex_cyan}}
+  {\normalfont\bfseries\color{fridexCyan}}
   {\filleft\Huge\thechapter}
   {1ex}
   {\titlerule\vspace{1ex}\filleft\Huge}
 
-\titleformat{\section}{\color{fridex_cyan}\Large\bfseries}{\thesection}{1em}{}[\titlerule]
-\titleformat{\subsection}{\color{fridex_cyan!70!black}\large\bfseries}{\thesubsection}{1em}{}
+\titleformat{\section}{\color{fridexCyan}\Large\bfseries}{\thesection}{1em}{}[\titlerule]
+\titleformat{\subsection}{\color{fridexCyan!70!black}\large\bfseries}{\thesubsection}{1em}{}
 
 % --- BOXES ---
 \newtcolorbox{fridexbox}[2][]{
-  colback=white,
-  colframe=fridex_cyan,
-  fonttitle=\bfseries,
-  title=#2,
-  arc=3mm,
-  boxrule=1pt,
-  #1
+    colback=white,
+    colframe=fridexCyan,
+    fonttitle=\bfseries,
+    title=#2,
+    arc=3mm,
+    boxrule=1pt,
+    #1
 }
 
 \newtcolorbox{mathlogic}[1]{
-  colback=math_bg,
-  colframe=fridex_cyan!50!black,
-  boxrule=0.5pt,
-  arc=1mm,
-  title=\textit{Teknik Formülasyon: #1},
-  fonttitle=\small\bfseries
+    colback=mathBg,
+    colframe=fridexCyan!50!black,
+    boxrule=0.5pt,
+    arc=1mm,
+    title=\textit{Teknik Formülasyon: #1},
+    fonttitle=\small\bfseries
 }
 
 % --- HEADER / FOOTER ---
 \pagestyle{fancy}
 \fancyhf{}
-\lhead{\textcolor{fridex_cyan}{Fridex / FridayX Kanonik Spesifikasyon}}
+\lhead{\textcolor{fridexCyan}{Fridex / FridayX Kanonik Spesifikasyon}}
 \rhead{\thepage}
 \lfoot{Bekircan Akyüz}
 \rfoot{Sürüm 4.0 (Canlı Durum)}
@@ -94,13 +98,13 @@
 \begin{titlepage}
   \centering
   \vspace*{3cm}
-  {\Huge \textbf{\textcolor{fridex_cyan}{FRIDEX}}} \\
+  {\Huge \textbf{\textcolor{fridexCyan}{FRIDEX}}} \\
   \vspace{0.5cm}
   {\Large \textbf{Otonom Bilişsel İşletim Sistemi (Cognos-OS)}} \\
   \vspace{0.35cm}
   {\large \textbf{FridayX Editör + Ajan Orkestrasyonu ile Kanonik Teknik Spesifikasyon}} \\
   \vspace{2cm}
-  \begin{tcolorbox}[colback=fridex_navy, colframe=fridex_navy, arc=0mm]
+  \begin{tcolorbox}[colback=fridexNavy, colframe=fridexNavy, arc=0mm]
     \centering \textcolor{white}{"Zeka, verideki düzeni değil, belirsizlikteki fırsatı görmektir."}
   \end{tcolorbox}
   \vfill
