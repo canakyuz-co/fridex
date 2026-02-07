@@ -4065,6 +4065,30 @@ export function SettingsView({
                 <div className="settings-section-subtitle">
                   Configure external providers and expose their models in the composer.
                 </div>
+                <div className="settings-toggle-row">
+                  <div>
+                    <div className="settings-toggle-title">Auto-refresh models on launch</div>
+                    <div className="settings-toggle-subtitle">
+                      Fetches the latest provider model list when the app starts.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={`settings-toggle ${
+                      appSettings.otherAiAutoRefreshEnabled ? "on" : ""
+                    }`}
+                    onClick={() =>
+                      void onUpdateAppSettings({
+                        ...appSettings,
+                        otherAiAutoRefreshEnabled:
+                          !appSettings.otherAiAutoRefreshEnabled,
+                      })
+                    }
+                    aria-pressed={appSettings.otherAiAutoRefreshEnabled}
+                  >
+                    <span className="settings-toggle-knob" />
+                  </button>
+                </div>
                 {appSettings.otherAiProviders.map((provider) => {
                   const draft = otherAiDrafts[provider.id] ?? {
                     id: provider.id,

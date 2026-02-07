@@ -67,6 +67,7 @@ const defaultSettings: AppSettings = {
       env: null,
     },
   ],
+  otherAiAutoRefreshEnabled: false,
   defaultAccessMode: "current",
   reviewDeliveryMode: "inline",
   composerModelShortcut: "cmd+shift+m",
@@ -184,6 +185,7 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
     ...settings,
     codexBin: settings.codexBin?.trim() ? settings.codexBin.trim() : null,
     codexArgs: settings.codexArgs?.trim() ? settings.codexArgs.trim() : null,
+    otherAiAutoRefreshEnabled: Boolean(settings.otherAiAutoRefreshEnabled),
     uiScale: clampUiScale(settings.uiScale),
     theme: allowedThemes.has(settings.theme) ? settings.theme : "system",
     uiFontFamily: normalizeFontWithLegacy(
@@ -220,6 +222,7 @@ export function useAppSettings() {
   );
   const syncInFlightRef = useRef(false);
   const didInitialOtherAiModelsSyncRef = useRef(false);
+  const lastAutoRefreshEnabledRef = useRef<boolean | null>(null);
   const clearSyncTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -276,9 +279,10 @@ export function useAppSettings() {
           return false;
         }
         const apiKey = (provider.apiKey ?? "").trim();
+        const cliCommand = (provider.command ?? "").trim();
         const models = Array.isArray(provider.models) ? provider.models : [];
-        // Only do work when we can fetch (API key) or when we need to auto-fill (empty list).
-        return apiKey.length > 0 || models.length === 0;
+        // Only do work when we can fetch (API/CLI) or when we need to auto-fill (empty list).
+        return apiKey.length > 0 || cliCommand.length > 0 || models.length === 0;
       });
 
       if (candidates.length === 0) {
@@ -306,28 +310,60 @@ export function useAppSettings() {
         }
         const providerType = provider.provider.trim().toLowerCase();
         const apiKey = (provider.apiKey ?? "").trim();
+        const cliCommand = (provider.command ?? "").trim();
+        const canUseCli = cliCommand.length > 0;
+        const prefersCli = (provider.protocol ?? "").trim().toLowerCase() === "cli";
 
         const fallback = getFallbackOtherAiModels(providerType);
         const existingModels = Array.isArray(provider.models) ? provider.models : [];
         let models = existingModels;
 
-        // Prefer API list only when key is already present; otherwise keep existing list.
-        // If the list is empty, auto-fill from fallback so the model picker works.
-        if (apiKey) {
-          try {
-            models = await listOtherAiModels(providerType, apiKey);
-          } catch {
-            models = fallback.length > 0 ? fallback : existingModels;
-          }
-        } else if (
-          providerType === "gemini" &&
-          (provider.command ?? "").trim().length > 0
-        ) {
-          // Gemini CLI can list models without an API key (it may rely on local auth).
+        // Prefer CLI when configured (CLI tends to expose new models first).
+        if (canUseCli && (prefersCli || !apiKey)) {
           try {
             models = await listOtherAiModelsCli(
               providerType,
-              provider.command!.trim(),
+              cliCommand,
+              provider.env ?? null,
+            );
+          } catch {
+            if (apiKey) {
+              try {
+                models = await listOtherAiModels(providerType, apiKey);
+              } catch {
+                if (existingModels.length === 0 && fallback.length > 0) {
+                  models = fallback;
+                }
+              }
+            } else if (existingModels.length === 0 && fallback.length > 0) {
+              models = fallback;
+            }
+          }
+        } else if (apiKey) {
+          try {
+            models = await listOtherAiModels(providerType, apiKey);
+          } catch {
+            if (canUseCli) {
+              try {
+                models = await listOtherAiModelsCli(
+                  providerType,
+                  cliCommand,
+                  provider.env ?? null,
+                );
+              } catch {
+                if (existingModels.length === 0 && fallback.length > 0) {
+                  models = fallback;
+                }
+              }
+            } else if (existingModels.length === 0 && fallback.length > 0) {
+              models = fallback;
+            }
+          }
+        } else if (canUseCli) {
+          try {
+            models = await listOtherAiModelsCli(
+              providerType,
+              cliCommand,
               provider.env ?? null,
             );
           } catch {
@@ -379,9 +415,20 @@ export function useAppSettings() {
     };
 
     if (!isLoading) {
-      if (!didInitialOtherAiModelsSyncRef.current) {
-        didInitialOtherAiModelsSyncRef.current = true;
-        void sync();
+      if (!settings.otherAiAutoRefreshEnabled) {
+        lastAutoRefreshEnabledRef.current = false;
+        if (active) {
+          setOtherAiModelsSyncPercent(null);
+        }
+      } else {
+        const shouldSync =
+          !didInitialOtherAiModelsSyncRef.current ||
+          lastAutoRefreshEnabledRef.current === false;
+        lastAutoRefreshEnabledRef.current = true;
+        if (shouldSync) {
+          didInitialOtherAiModelsSyncRef.current = true;
+          void sync();
+        }
       }
     }
 

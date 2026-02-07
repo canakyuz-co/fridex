@@ -371,6 +371,11 @@ pub(crate) struct AppSettings {
     pub(crate) remote_backend_token: Option<String>,
     #[serde(default = "default_other_ai_providers", rename = "otherAiProviders")]
     pub(crate) other_ai_providers: Vec<OtherAiProvider>,
+    #[serde(
+        default = "default_other_ai_auto_refresh_enabled",
+        rename = "otherAiAutoRefreshEnabled"
+    )]
+    pub(crate) other_ai_auto_refresh_enabled: bool,
     #[serde(default = "default_access_mode", rename = "defaultAccessMode")]
     pub(crate) default_access_mode: String,
     #[serde(default = "default_review_delivery_mode", rename = "reviewDeliveryMode")]
@@ -914,6 +919,10 @@ fn default_other_ai_providers() -> Vec<OtherAiProvider> {
     ]
 }
 
+fn default_other_ai_auto_refresh_enabled() -> bool {
+    false
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -923,6 +932,7 @@ impl Default for AppSettings {
             remote_backend_host: default_remote_backend_host(),
             remote_backend_token: None,
             other_ai_providers: default_other_ai_providers(),
+            other_ai_auto_refresh_enabled: default_other_ai_auto_refresh_enabled(),
             default_access_mode: "current".to_string(),
             review_delivery_mode: default_review_delivery_mode(),
             composer_model_shortcut: default_composer_model_shortcut(),

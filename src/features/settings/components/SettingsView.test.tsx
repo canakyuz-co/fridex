@@ -47,6 +47,7 @@ const baseSettings: AppSettings = {
       defaultModel: null,
     },
   ],
+  otherAiAutoRefreshEnabled: false,
   defaultAccessMode: "current",
   reviewDeliveryMode: "inline",
   composerModelShortcut: null,

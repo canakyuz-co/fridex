@@ -162,6 +162,7 @@ export type AppSettings = {
   remoteBackendHost: string;
   remoteBackendToken: string | null;
   otherAiProviders: OtherAiProvider[];
+  otherAiAutoRefreshEnabled: boolean;
   defaultAccessMode: AccessMode;
   reviewDeliveryMode: "inline" | "detached";
   composerModelShortcut: string | null;
